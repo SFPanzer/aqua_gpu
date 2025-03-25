@@ -1,0 +1,30 @@
+{
+  "name": "aqua_gpu",
+  "version": "0.0.1",
+  "scripts": {
+    "commit": "npx git-cz",
+    "format": "cargo fmt",
+    "check_format": "cargo fmt --check",
+    "clippy": "cargo clippy",
+    "run": "cargo run",
+    "build": "cargo build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SFPanzer/aqua_gpu.git"
+  },
+  "keywords": [],
+  "author": "",
+  "homepage": "https://github.com/SFPanzer/aqua_gpu#readme",
+  "description": "",
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.0",
+    "@commitlint/config-conventional": "^19.8.0",
+    "commitizen": "^4.3.1"
+  },
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
+  }
+}

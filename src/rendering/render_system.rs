@@ -91,8 +91,8 @@ impl RenderSystem {
         self.device.clone()
     }
 
-    pub fn custom_render_pipeline(&self) -> &Box<(dyn CustomRenderPipeline + 'static)> {
-        &self.custom_render_pipeline
+    pub fn custom_render_pipeline(&self) -> &(dyn CustomRenderPipeline + 'static) {
+        &*self.custom_render_pipeline
     }
 
     fn redraw(&mut self) {
@@ -213,16 +213,14 @@ fn get_vulkan_instance(event_loop: &EventLoop<()>) -> Arc<Instance> {
     let required_extensions = Surface::required_extensions(event_loop).unwrap();
 
     let library = VulkanLibrary::new().unwrap();
-    let instance = Instance::new(
+    Instance::new(
         library,
         InstanceCreateInfo {
             enabled_extensions: required_extensions,
             ..Default::default()
         },
     )
-    .unwrap();
-
-    instance
+    .unwrap()
 }
 
 fn get_device_and_queue(

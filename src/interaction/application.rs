@@ -31,8 +31,7 @@ impl Application {
 impl Default for Application {
     fn default() -> Self {
         let event_loop = EventLoop::new().unwrap();
-        let render_system =
-            RenderSystem::new(&event_loop, Box::new(DefaultRenderPipeline::default()));
+        let render_system = RenderSystem::new(&event_loop, Box::new(DefaultRenderPipeline));
 
         Self {
             event_loop,
