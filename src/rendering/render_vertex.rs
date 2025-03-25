@@ -11,5 +11,4 @@ impl RenderVertex {
     pub fn new(position: [f32; 2]) -> Self {
         Self { position }
     }
-    
 }

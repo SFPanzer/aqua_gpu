@@ -1,0 +1,35 @@
+name: Rust CI Check
+
+on:
+  push:
+    branches: "*"
+
+jobs:
+  check:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+          default: true
+
+      - name: Npm install
+        run: npm install
+
+      - name: Check commit messages
+        run: npx commitlint --last
+
+      - name: Check code formatting
+        run: cargo fmt --check
+
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
+
+      - name: Run tests
+        run: cargo test
