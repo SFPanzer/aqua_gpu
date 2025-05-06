@@ -77,23 +77,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
 
 [[package]]
-name = "approx"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f2a05fd1bd10b2527e20a2cd32d8873d115b8b39fe219ee25f42a8aca6ba278"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "aqua_gpu"
 version = "0.1.0"
 dependencies = [
- "cgmath",
  "egui_winit_vulkano",
+ "glam",
  "serde",
  "vulkano",
  "vulkano-shaders",
+ "vulkano-taskgraph",
  "vulkano-util",
  "winit",
 ]
@@ -344,16 +336,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
-name = "cgmath"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a98d30140e3296250832bbaaff83b27dcd6fa3cc70fb6f1f3e5c9c0023b5317"
-dependencies = [
- "approx",
- "num-traits",
-]
-
-[[package]]
 name = "clipboard-win"
 version = "5.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -394,6 +376,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ca0197aee26d1ae37445ee532fefce43251d24cc7c166799f4d46817f1d3973"
 dependencies = [
  "crossbeam-utils",
+]
+
+[[package]]
+name = "concurrent-slotmap"
+version = "0.1.0-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b986749ea6185190813567c2a78cab7d1fccab01589470a05ebc829afd85ae6c"
+dependencies = [
+ "virtual-buffer",
 ]
 
 [[package]]
@@ -764,6 +755,15 @@ checksum = "3fb2d69b19215e18bb912fa30f7ce15846e301408695e44e0ef719f1da9e19f2"
 dependencies = [
  "color_quant",
  "weezl",
+]
+
+[[package]]
+name = "glam"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "779ae4bf7e8421cf91c0b3b64e7e8b40b862fba4d393f59150042de7c4965a94"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -2379,6 +2379,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
+name = "virtual-buffer"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b434093a2de01d3b27e6246b0ececca4cc2a77f046bef06a9dc1216e3d892a91"
+dependencies = [
+ "libc",
+ "windows-targets 0.52.6",
+]
+
+[[package]]
 name = "vk-parse"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2443,6 +2453,21 @@ dependencies = [
  "quote",
  "shaderc",
  "syn",
+ "vulkano",
+]
+
+[[package]]
+name = "vulkano-taskgraph"
+version = "0.35.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "316480b7b02d8a98a3965e4d2f21129e6f1749eb1e126db108daa8bede994957"
+dependencies = [
+ "ash",
+ "concurrent-slotmap",
+ "foldhash",
+ "parking_lot",
+ "smallvec",
+ "thread_local",
  "vulkano",
 ]
 
