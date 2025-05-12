@@ -19,6 +19,11 @@ jobs:
           components: rustfmt, clippy
           default: true
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
       - name: Npm install
         run: npm install
 
