@@ -10,7 +10,7 @@ use winit::event_loop::ActiveEventLoop;
 use crate::{
     core::{Camera, Particles},
     shaders,
-    utils::VulkanoBackend,
+    utils::{FpsCounter, VulkanoBackend},
 };
 
 use super::{render_task::RenderTask, RenderContext};
@@ -19,14 +19,17 @@ pub struct RenderSystem {
     vulkano_backend: Option<Rc<VulkanoBackend>>,
     render_context: Option<Rc<RefCell<RenderContext>>>,
     render_task: Option<RenderTask>,
+    fps_counter: FpsCounter,
 }
 
 impl RenderSystem {
     pub fn new() -> Self {
+        let fps_counter = FpsCounter::new(16, 1.0);
         Self {
             vulkano_backend: None,
             render_context: None,
             render_task: None,
+            fps_counter,
         }
     }
 
@@ -120,12 +123,23 @@ impl RenderSystem {
             .as_ref()
             .unwrap()
             .execute_gpu_task(self.render_task.as_mut().unwrap(), particles);
+
+        self.fps_counter.tick();
+        let fps = self.fps_counter.fps();
+        self.update_window_title(&format!("Aqua GPU -FPS: {}", fps as u32));
     }
 
     pub fn request_redraw(&mut self) {
         if let Some(render_context) = &self.render_context {
             let render_context = render_context.borrow();
             render_context.window().request_redraw();
+        }
+    }
+
+    fn update_window_title(&mut self, title: &str) {
+        if let Some(render_context) = &self.render_context {
+            let render_context = render_context.borrow();
+            render_context.window().set_title(title);
         }
     }
 }
