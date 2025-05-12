@@ -1,10 +1,17 @@
-use interaction::Application;
-
-mod interaction;
-mod rendering;
+mod application;
+mod core;
 mod shaders;
+mod systems;
+mod utils;
 
-fn main() {
-    let application = Application::default();
-    application.run();
+use std::error::Error;
+
+use application::App;
+use winit::event_loop::EventLoop;
+
+fn main() -> Result<(), impl Error> {
+    let event_loop = EventLoop::new().unwrap();
+    let mut app = App::new(&event_loop);
+
+    event_loop.run_app(&mut app)
 }

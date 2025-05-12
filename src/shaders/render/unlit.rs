@@ -4,10 +4,16 @@ pub mod vs {
         src: r"
             #version 450
 
-            layout(location = 0) in vec2 position;
+            layout(location = 0) in vec3 position;
+
+            layout(set = 0, binding = 0) uniform Data {
+                mat4 view;
+                mat4 proj;
+            } uniforms;
 
             void main() {
-                gl_Position = vec4(position, 0.0, 1.0);
+                gl_Position = uniforms.proj * uniforms.view * vec4(position, 1.0);
+                gl_PointSize = 10.0;
             }
         ",
     }
