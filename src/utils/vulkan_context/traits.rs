@@ -5,14 +5,8 @@ use vulkano::{
     device::{self, Queue},
 };
 
-use crate::core::Particles;
-
 pub trait GpuTask {
-    fn record(
-        &self,
-        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        particles: &Particles,
-    );
+    fn record(&self, builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>);
     fn submit(
         &mut self,
         command_buffer: Arc<PrimaryAutoCommandBuffer>,
