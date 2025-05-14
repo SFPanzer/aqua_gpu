@@ -1,19 +1,17 @@
-use std::{cell::RefCell, rc::Rc};
-
 use crate::utils::VulkanoBackend;
 
 use super::particles::Particles;
 
 pub(crate) struct ParticlePingPongBuffer {
-    pub particles: [Rc<RefCell<Particles>>; 2],
+    pub particles: [Box<Particles>; 2],
     pub current: usize,
 }
 
 impl ParticlePingPongBuffer {
     pub fn new(vulkano_backend: &VulkanoBackend) -> Self {
         let particles = [
-            Rc::new(RefCell::new(Particles::new(vulkano_backend))),
-            Rc::new(RefCell::new(Particles::new(vulkano_backend))),
+            Box::new(Particles::new(vulkano_backend)),
+            Box::new(Particles::new(vulkano_backend)),
         ];
         Self {
             particles,
@@ -25,11 +23,11 @@ impl ParticlePingPongBuffer {
         self.current = (self.current + 1) % 2;
     }
 
-    pub fn src(&self) -> &Rc<RefCell<Particles>> {
+    pub fn src(&self) -> &Particles {
         &self.particles[self.current]
     }
 
-    pub fn dst(&self) -> &Rc<RefCell<Particles>> {
-        &self.particles[(self.current + 1) % 2]
+    pub fn dst(&mut self) -> &mut Particles {
+        &mut self.particles[(self.current + 1) % 2]
     }
 }
