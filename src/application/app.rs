@@ -39,7 +39,7 @@ impl App {
 
     pub fn init(&mut self, event_loop: &ActiveEventLoop) {
         self.render_system.init(event_loop, &self.vulkano_backend);
-        self.particles.dst().borrow_mut().add_particles(
+        self.particles.dst().add_particles(
             &[
                 (
                     ParticlePosition::new(Vec3::new(0.5, 0., 0.)),
@@ -83,7 +83,7 @@ impl ApplicationHandler for App {
                 self.particles.swap();
                 self.update();
                 self.render_system
-                    .render(&self.camera, &self.particles.src().borrow());
+                    .render(&self.camera, &self.particles.src());
             }
             _ => {}
         }
