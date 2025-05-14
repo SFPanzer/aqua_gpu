@@ -9,7 +9,7 @@ use winit::{
 };
 
 use crate::{
-    core::{Camera, Particle, Particles},
+    core::{Camera, ParticlePingPongBuffer, ParticlePosition, ParticleVelocity},
     systems::RenderSystem,
     utils::VulkanoBackend,
 };
@@ -18,7 +18,7 @@ pub struct App {
     vulkano_backend: Rc<VulkanoBackend>,
     render_system: RenderSystem,
     camera: Camera,
-    particles: Particles,
+    particles: ParticlePingPongBuffer,
 }
 
 impl App {
@@ -27,7 +27,7 @@ impl App {
         let render_system = RenderSystem::new();
 
         let camera = Camera::new(Vec3::new(0., 0., -1.), Quat::IDENTITY, 45.0, 0.1, 100.0);
-        let particles = Particles::new(&vulkano_backend);
+        let particles = ParticlePingPongBuffer::new(&vulkano_backend);
 
         Self {
             vulkano_backend: Rc::new(vulkano_backend),
@@ -39,11 +39,20 @@ impl App {
 
     pub fn init(&mut self, event_loop: &ActiveEventLoop) {
         self.render_system.init(event_loop, &self.vulkano_backend);
-        self.particles.add_particles(
+        self.particles.dst().borrow_mut().add_particles(
             &[
-                Particle::new(Vec3::new(0.5, 0., 0.)),
-                Particle::new(Vec3::new(0., 0.5, 0.)),
-                Particle::new(Vec3::new(-0.5, 0., 0.)),
+                (
+                    ParticlePosition::new(Vec3::new(0.5, 0., 0.)),
+                    ParticleVelocity::new(Vec3::new(0., 0., 0.)),
+                ),
+                (
+                    ParticlePosition::new(Vec3::new(0., 0.5, 0.)),
+                    ParticleVelocity::new(Vec3::new(0., 0., 0.)),
+                ),
+                (
+                    ParticlePosition::new(Vec3::new(-0.5, 0., 0.)),
+                    ParticleVelocity::new(Vec3::new(0., 0., 0.)),
+                ),
             ],
             &self.vulkano_backend,
         );
@@ -71,8 +80,10 @@ impl ApplicationHandler for App {
                 self.render_system.request_recreate_swapchain();
             }
             WindowEvent::RedrawRequested => {
-                self.render_system.render(&self.camera, &self.particles);
+                self.particles.swap();
                 self.update();
+                self.render_system
+                    .render(&self.camera, &self.particles.src().borrow());
             }
             _ => {}
         }
