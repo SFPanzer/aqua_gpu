@@ -10,13 +10,14 @@ use winit::{
 
 use crate::{
     core::{Camera, ParticlePingPongBuffer, ParticlePosition, ParticleVelocity},
-    systems::RenderSystem,
+    systems::{RenderSystem, SimulationSystem},
     utils::VulkanoBackend,
 };
 
 pub struct App {
     vulkano_backend: Rc<VulkanoBackend>,
     render_system: RenderSystem,
+    simulation_system: SimulationSystem,
     camera: Camera,
     particles: ParticlePingPongBuffer,
 }
@@ -25,6 +26,7 @@ impl App {
     pub fn new(event_loop: &EventLoop<()>) -> Self {
         let vulkano_backend = VulkanoBackend::new(event_loop);
         let render_system = RenderSystem::new();
+        let simulation_system = SimulationSystem::new();
 
         let camera = Camera::new(Vec3::new(0., 0., -1.), Quat::IDENTITY, 45.0, 0.1, 100.0);
         let particles = ParticlePingPongBuffer::new(&vulkano_backend);
@@ -32,12 +34,14 @@ impl App {
         Self {
             vulkano_backend: Rc::new(vulkano_backend),
             render_system,
+            simulation_system,
             camera,
             particles,
         }
     }
 
     pub fn init(&mut self, event_loop: &ActiveEventLoop) {
+        self.simulation_system.init(&self.vulkano_backend);
         self.render_system.init(event_loop, &self.vulkano_backend);
         self.particles.dst().add_particles(
             &[
@@ -82,6 +86,11 @@ impl ApplicationHandler for App {
             WindowEvent::RedrawRequested => {
                 self.particles.swap();
                 self.update();
+
+                self.simulation_system.update(
+                    self.vulkano_backend.descriptor_set_allocator(),
+                    self.particles.dst(),
+                );
                 self.render_system
                     .render(&self.camera, &self.particles.src());
             }
