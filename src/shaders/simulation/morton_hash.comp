@@ -1,0 +1,55 @@
+#version 450
+
+layout(local_size_x = 256) in;
+
+layout(push_constant) uniform Constants
+{
+    uint particle_count;
+    float grid_size;
+}
+constants;
+
+layout(binding = 0) readonly buffer PositionBuffer
+{
+    vec4 positions[];
+};
+
+struct MortonEntry
+{
+    uint mortonCode;
+    uint index;
+};
+
+layout(binding = 1) writeonly buffer MortonBuffer
+{
+    MortonEntry mortonBuffer[];
+};
+
+uint expandBits(uint v)
+{
+    v = (v * 0x00010001u) & 0xFF0000FFu;
+    v = (v * 0x00000101u) & 0x0F00F00Fu;
+    v = (v * 0x00000011u) & 0xC30C30C3u;
+    v = (v * 0x00000005u) & 0x49249249u;
+    return v;
+}
+
+uint morton3D(uvec3 grid_pos)
+{
+    return (expandBits(grid_pos.x) << 0) | (expandBits(grid_pos.y) << 1) | (expandBits(grid_pos.z) << 2);
+}
+
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= constants.particle_count)
+        return;
+
+    vec3 pos = positions[id].xyz;
+    uvec3 grid_pos = uvec3(ivec3(floor(pos / constants.grid_size)) & 0xFFFFFFFFu);
+
+    uint morton = morton3D(grid_pos);
+
+    mortonBuffer[id].mortonCode = morton;
+    mortonBuffer[id].index = id;
+}

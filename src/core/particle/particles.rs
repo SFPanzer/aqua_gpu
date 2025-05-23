@@ -1,18 +1,16 @@
-use std::sync::Arc;
+use std::{any::TypeId, collections::HashMap, sync::Arc};
 
 use vulkano::{
-    buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
-    command_buffer::{
+    buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer}, command_buffer::{
         AutoCommandBufferBuilder, BufferCopy, CopyBufferInfoTyped, PrimaryAutoCommandBuffer,
-    },
-    device::{Device, Queue},
-    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
-    sync::{self, GpuFuture},
+    }, descriptor_set::DescriptorSet, device::{Device, Queue}, memory::allocator::{AllocationCreateInfo, MemoryTypeFilter}, sync::{self, GpuFuture}
 };
 
 use crate::utils::{GpuTask, VulkanoBackend};
 
 use super::particle_data::{ParticleHashEntry, ParticlePosition, ParticleVelocity};
+
+pub(crate) type TaskId = TypeId;
 
 const PARTICLE_MAX_COUNT: u32 = 0x100000; // 1 million particles
 
@@ -22,6 +20,7 @@ pub(crate) struct Particles {
     position: Subbuffer<[ParticlePosition]>,
     velocity: Subbuffer<[ParticleVelocity]>,
     hash: Subbuffer<[ParticleHashEntry]>,
+    descriptor_sets: HashMap<TaskId, Arc<DescriptorSet>>,
 }
 
 impl Particles {
@@ -74,6 +73,7 @@ impl Particles {
             hash,
             count: 0,
             cursor: 0,
+            descriptor_sets: HashMap::new(),
         }
     }
 
@@ -94,6 +94,10 @@ impl Particles {
 
     pub fn particle_count(&self) -> u32 {
         self.count
+    }
+
+    pub fn descriptor_sets(&mut self) -> &mut HashMap<TaskId, Arc<DescriptorSet>> {
+        &mut self.descriptor_sets
     }
 
     pub fn add_particles(

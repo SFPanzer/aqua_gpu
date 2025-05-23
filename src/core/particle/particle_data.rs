@@ -17,8 +17,8 @@ pub(crate) struct ParticleVelocity {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, BufferContents)]
 pub(crate) struct ParticleHashEntry {
-    hash: u32,
-    index: u32,
+    pub hash: u32,
+    pub index: u32,
 }
 
 impl ParticlePosition {
