@@ -1,3 +1,4 @@
+mod approx_eq;
 mod fps_counter;
 mod vulkan_context;
 
@@ -6,3 +7,6 @@ pub(crate) use vulkan_context::{GpuTask, VulkanoBackend};
 
 #[cfg(test)]
 pub(crate) use vulkan_context::VulkanoHeadlessBackend;
+
+#[cfg(test)]
+pub(crate) use approx_eq::approx_eq;

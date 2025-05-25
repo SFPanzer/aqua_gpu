@@ -1,9 +1,14 @@
 use std::{any::TypeId, collections::HashMap, sync::Arc};
 
 use vulkano::{
-    buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer}, command_buffer::{
+    buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
+    command_buffer::{
         AutoCommandBufferBuilder, BufferCopy, CopyBufferInfoTyped, PrimaryAutoCommandBuffer,
-    }, descriptor_set::DescriptorSet, device::{Device, Queue}, memory::allocator::{AllocationCreateInfo, MemoryTypeFilter}, sync::{self, GpuFuture}
+    },
+    descriptor_set::DescriptorSet,
+    device::{Device, Queue},
+    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
+    sync::{self, GpuFuture},
 };
 
 use crate::utils::{GpuTask, VulkanoBackend};

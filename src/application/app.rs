@@ -28,7 +28,7 @@ impl App {
         let render_system = RenderSystem::new();
         let simulation_system = SimulationSystem::new();
 
-        let camera = Camera::new(Vec3::new(0., 0., -1.), Quat::IDENTITY, 45.0, 0.1, 100.0);
+        let camera = Camera::new(Vec3::new(0., 0., 1.), Quat::IDENTITY, 45.0, 0.1, 100.0);
         let particles = ParticlePingPongBuffer::new(&vulkano_backend);
 
         Self {
@@ -92,7 +92,7 @@ impl ApplicationHandler for App {
                     self.particles.dst(),
                 );
                 self.render_system
-                    .render(&self.camera, &self.particles.src());
+                    .render(&self.camera, self.particles.src());
             }
             _ => {}
         }
