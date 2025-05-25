@@ -1,0 +1,25 @@
+#version 450
+
+layout(local_size_x = 256) in;
+
+layout(push_constant) uniform Constants
+{
+    uint particle_count;
+    float dt;
+    vec3 gravity;
+}
+constants;
+
+layout(set = 0, binding = 0) buffer VelocityBuffer
+{
+    vec4 velocities[];
+};
+
+void main()
+{
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= constants.particle_count)
+        return;
+
+    velocities[idx].xyz += constants.gravity * constants.dt;
+}

@@ -5,13 +5,13 @@ use vulkano::{buffer::BufferContents, pipeline::graphics::vertex_input::Vertex};
 #[derive(Copy, Clone, Debug, BufferContents, Vertex)]
 pub(crate) struct ParticlePosition {
     #[format(R32G32B32A32_SFLOAT)]
-    position: [f32; 4],
+    pub position: [f32; 4],
 }
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, BufferContents)]
 pub(crate) struct ParticleVelocity {
-    velocity: [f32; 4],
+    pub velocity: [f32; 4],
 }
 
 #[repr(C)]

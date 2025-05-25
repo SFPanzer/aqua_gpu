@@ -20,7 +20,7 @@ impl Camera {
     }
 
     pub fn view_matrix(&self) -> Mat4 {
-        let dir = self.rotation * Vec3::Z;
+        let dir = self.rotation * -Vec3::Z;
         let up = self.rotation * Vec3::Y;
         Mat4::look_to_rh(self.position, dir, up)
     }
