@@ -1,4 +1,6 @@
-use crate::utils::VulkanoBackend;
+use std::sync::Arc;
+
+use vulkano::memory::allocator::StandardMemoryAllocator;
 
 use super::particles::Particles;
 
@@ -8,10 +10,10 @@ pub(crate) struct ParticlePingPongBuffer {
 }
 
 impl ParticlePingPongBuffer {
-    pub fn new(vulkano_backend: &VulkanoBackend) -> Self {
+    pub fn new(memory_allocator: &Arc<StandardMemoryAllocator>) -> Self {
         let particles = [
-            Box::new(Particles::new(vulkano_backend)),
-            Box::new(Particles::new(vulkano_backend)),
+            Box::new(Particles::new(memory_allocator)),
+            Box::new(Particles::new(memory_allocator)),
         ];
         Self {
             particles,

@@ -10,7 +10,7 @@ use winit::event_loop::ActiveEventLoop;
 use crate::{
     core::{Camera, Particles},
     shaders,
-    utils::{FpsCounter, VulkanoBackend},
+    utils::{FpsCounter, GpuTaskExecutor, VulkanoBackend},
 };
 
 use super::{render_task::RenderTask, RenderContext};
@@ -88,7 +88,7 @@ impl RenderSystem {
         self.vulkano_backend
             .as_ref()
             .unwrap()
-            .execute_gpu_task(&mut render_task);
+            .execute(&mut render_task);
 
         self.fps_counter.tick();
         let fps = self.fps_counter.fps();

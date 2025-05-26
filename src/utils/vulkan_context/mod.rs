@@ -5,7 +5,7 @@ mod traits;
 mod headless;
 
 pub(crate) use context::VulkanoBackend;
-pub(crate) use traits::GpuTask;
+pub(crate) use traits::{GpuTask, GpuTaskExecutor};
 
 #[allow(unused)]
 #[cfg(test)]

@@ -2,7 +2,8 @@ mod camera;
 mod particle;
 
 pub(crate) use camera::Camera;
+#[allow(unused_imports)]
 pub(crate) use particle::{
-    ParticleHashEntry, ParticlePingPongBuffer, ParticlePosition, ParticleVelocity, Particles,
-    TaskId,
+    ParticleHashEntry, ParticleInitData, ParticlePingPongBuffer, ParticlePosition,
+    ParticleVelocity, Particles, TaskId,
 };

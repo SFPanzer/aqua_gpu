@@ -5,7 +5,7 @@ use vulkano::{
     device::{self, Queue},
 };
 
-pub trait GpuTask {
+pub(crate) trait GpuTask {
     fn record(&self, builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>);
     fn submit(
         &mut self,
@@ -13,4 +13,8 @@ pub trait GpuTask {
         queue: &Arc<Queue>,
         device: &Arc<device::Device>,
     );
+}
+
+pub(crate) trait GpuTaskExecutor {
+    fn execute(&self, task: &mut dyn GpuTask);
 }
