@@ -9,8 +9,8 @@ use winit::{
 };
 
 use crate::{
-    core::{Camera, ParticlePingPongBuffer, ParticlePosition, ParticleVelocity},
-    systems::{RenderSystem, SimulationSystem},
+    core::{Camera, ParticleInitData, ParticlePingPongBuffer},
+    systems::{RenderSystem, SimulationConfig, SimulationSystem},
     utils::VulkanoBackend,
 };
 
@@ -26,10 +26,10 @@ impl App {
     pub fn new(event_loop: &EventLoop<()>) -> Self {
         let vulkano_backend = VulkanoBackend::new(event_loop);
         let render_system = RenderSystem::new();
-        let simulation_system = SimulationSystem::new();
+        let simulation_system = SimulationSystem::new(SimulationConfig::default());
 
         let camera = Camera::new(Vec3::new(0., 0., 1.), Quat::IDENTITY, 45.0, 0.1, 100.0);
-        let particles = ParticlePingPongBuffer::new(&vulkano_backend);
+        let particles = ParticlePingPongBuffer::new(vulkano_backend.memory_allocator());
 
         Self {
             vulkano_backend: Rc::new(vulkano_backend),
@@ -45,20 +45,21 @@ impl App {
         self.render_system.init(event_loop, &self.vulkano_backend);
         self.particles.dst().add_particles(
             &[
-                (
-                    ParticlePosition::new(Vec3::new(0.5, 0., 0.)),
-                    ParticleVelocity::new(Vec3::new(0., 0., 0.)),
-                ),
-                (
-                    ParticlePosition::new(Vec3::new(0., 0.5, 0.)),
-                    ParticleVelocity::new(Vec3::new(0., 0., 0.)),
-                ),
-                (
-                    ParticlePosition::new(Vec3::new(-0.5, 0., 0.)),
-                    ParticleVelocity::new(Vec3::new(0., 0., 0.)),
-                ),
+                ParticleInitData {
+                    position: Vec3::new(0.5, 0.0, 0.0),
+                    velocitie: Vec3::new(0.0, 0.0, 0.0),
+                },
+                ParticleInitData {
+                    position: Vec3::new(0.0, 0.5, 0.0),
+                    velocitie: Vec3::new(0.0, 0.0, 0.0),
+                },
+                ParticleInitData {
+                    position: Vec3::new(-0.5, 0.0, 0.0),
+                    velocitie: Vec3::new(0.0, 0.0, 0.0),
+                },
             ],
-            &self.vulkano_backend,
+            self.vulkano_backend.memory_allocator(),
+            self.vulkano_backend.as_ref(),
         );
     }
 

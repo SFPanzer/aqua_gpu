@@ -1,5 +1,6 @@
 use std::{any::TypeId, collections::HashMap, sync::Arc};
 
+use glam::Vec3;
 use vulkano::{
     buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
     command_buffer::{
@@ -7,17 +8,22 @@ use vulkano::{
     },
     descriptor_set::DescriptorSet,
     device::{Device, Queue},
-    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
+    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
     sync::{self, GpuFuture},
 };
 
-use crate::utils::{GpuTask, VulkanoBackend};
+use crate::utils::{GpuTask, GpuTaskExecutor};
 
 use super::particle_data::{ParticleHashEntry, ParticlePosition, ParticleVelocity};
 
 pub(crate) type TaskId = TypeId;
 
 const PARTICLE_MAX_COUNT: u32 = 0x100000; // 1 million particles
+
+pub struct ParticleInitData {
+    pub position: Vec3,
+    pub velocitie: Vec3,
+}
 
 pub(crate) struct Particles {
     count: u32,
@@ -29,45 +35,57 @@ pub(crate) struct Particles {
 }
 
 impl Particles {
-    pub fn new(vulkano_backend: &VulkanoBackend) -> Self {
+    pub fn new(memory_allocator: &Arc<StandardMemoryAllocator>) -> Self {
+        let allocation_create_info = {
+            let memory_type_filter = {
+                #[cfg(test)]
+                {
+                    MemoryTypeFilter::PREFER_HOST | MemoryTypeFilter::HOST_RANDOM_ACCESS
+                }
+
+                #[cfg(not(test))]
+                {
+                    MemoryTypeFilter::PREFER_DEVICE
+                }
+            };
+            AllocationCreateInfo {
+                memory_type_filter,
+                ..Default::default()
+            }
+        };
+
         let position = Buffer::new_slice(
-            vulkano_backend.memory_allocator().clone(),
+            memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::STORAGE_BUFFER
                     | BufferUsage::VERTEX_BUFFER
+                    | BufferUsage::TRANSFER_SRC
                     | BufferUsage::TRANSFER_DST,
                 ..Default::default()
             },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
+            allocation_create_info.clone(),
             PARTICLE_MAX_COUNT as u64,
         )
         .unwrap();
         let velocity = Buffer::new_slice(
-            vulkano_backend.memory_allocator().clone(),
+            memory_allocator.clone(),
             BufferCreateInfo {
-                usage: BufferUsage::STORAGE_BUFFER | BufferUsage::TRANSFER_DST,
+                usage: BufferUsage::STORAGE_BUFFER
+                    | BufferUsage::TRANSFER_SRC
+                    | BufferUsage::TRANSFER_DST,
                 ..Default::default()
             },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
+            allocation_create_info.clone(),
             PARTICLE_MAX_COUNT as u64,
         )
         .unwrap();
         let hash = Buffer::new_slice(
-            vulkano_backend.memory_allocator().clone(),
+            memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::STORAGE_BUFFER,
                 ..Default::default()
             },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
-                ..Default::default()
-            },
+            allocation_create_info,
             PARTICLE_MAX_COUNT as u64,
         )
         .unwrap();
@@ -83,21 +101,21 @@ impl Particles {
     }
 
     #[allow(unused)]
-    pub fn particle_position_buffer(&self) -> &Subbuffer<[ParticlePosition]> {
+    pub fn position(&self) -> &Subbuffer<[ParticlePosition]> {
         &self.position
     }
 
     #[allow(unused)]
-    pub fn particle_velocity_buffer(&self) -> &Subbuffer<[ParticleVelocity]> {
+    pub fn velocity(&self) -> &Subbuffer<[ParticleVelocity]> {
         &self.velocity
     }
 
     #[allow(unused)]
-    pub fn particle_hash_buffer(&self) -> &Subbuffer<[ParticleHashEntry]> {
+    pub fn hash(&self) -> &Subbuffer<[ParticleHashEntry]> {
         &self.hash
     }
 
-    pub fn particle_count(&self) -> u32 {
+    pub fn count(&self) -> u32 {
         self.count
     }
 
@@ -107,49 +125,67 @@ impl Particles {
 
     pub fn add_particles(
         &mut self,
-        particles: &[(ParticlePosition, ParticleVelocity)],
-        vulkano_backend: &VulkanoBackend,
+        particles_init_data: &[ParticleInitData],
+        memory_allocator: &Arc<StandardMemoryAllocator>,
+        task_executor: &dyn GpuTaskExecutor,
     ) {
-        let regions = if (self.cursor + particles.len() as u32) < self.position.len() as u32 {
-            vec![BufferCopy {
-                src_offset: 0,
-                dst_offset: self.cursor as u64,
-                size: particles.len() as u64,
-                ..Default::default()
-            }]
-        } else {
-            let head_size = self.position.len() as u32 - self.cursor;
-            let tail_size = particles.len() as u32 - head_size;
-            vec![
-                BufferCopy {
+        let regions =
+            if (self.cursor + particles_init_data.len() as u32) < self.position.len() as u32 {
+                vec![BufferCopy {
                     src_offset: 0,
                     dst_offset: self.cursor as u64,
-                    size: head_size as u64,
+                    size: particles_init_data.len() as u64,
                     ..Default::default()
-                },
-                BufferCopy {
-                    src_offset: head_size as u64,
-                    dst_offset: 0,
-                    size: tail_size as u64,
-                    ..Default::default()
-                },
-            ]
-        };
-        self.replace_particles(particles, &regions, vulkano_backend);
-        self.count = (self.count + particles.len() as u32).min(PARTICLE_MAX_COUNT);
+                }]
+            } else {
+                let head_size = self.position.len() as u32 - self.cursor;
+                let tail_size = particles_init_data.len() as u32 - head_size;
+                vec![
+                    BufferCopy {
+                        src_offset: 0,
+                        dst_offset: self.cursor as u64,
+                        size: head_size as u64,
+                        ..Default::default()
+                    },
+                    BufferCopy {
+                        src_offset: head_size as u64,
+                        dst_offset: 0,
+                        size: tail_size as u64,
+                        ..Default::default()
+                    },
+                ]
+            };
+        self.replace_particles(
+            particles_init_data,
+            &regions,
+            memory_allocator,
+            task_executor,
+        );
+        self.count = (self.count + particles_init_data.len() as u32).min(PARTICLE_MAX_COUNT);
     }
 
     pub fn replace_particles(
         &mut self,
-        particles: &[(ParticlePosition, ParticleVelocity)],
+        particles_init_data: &[ParticleInitData],
         regions: &[BufferCopy],
-        vulkano_backend: &VulkanoBackend,
+        memory_allocator: &Arc<StandardMemoryAllocator>,
+        task_executor: &dyn GpuTaskExecutor,
     ) {
-        let positions = particles.iter().map(|(p, _)| *p).collect::<Vec<_>>();
-        let velocities = particles.iter().map(|(_, v)| *v).collect::<Vec<_>>();
+        let positions = particles_init_data
+            .iter()
+            .map(|p| ParticlePosition {
+                position: p.position.extend(0.0).to_array(),
+            })
+            .collect::<Vec<_>>();
+        let velocities = particles_init_data
+            .iter()
+            .map(|p| ParticleVelocity {
+                velocity: p.velocitie.extend(0.0).to_array(),
+            })
+            .collect::<Vec<_>>();
 
         let stage_position_buffer = Buffer::from_iter(
-            vulkano_backend.memory_allocator().clone(),
+            memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::TRANSFER_SRC,
                 ..Default::default()
@@ -162,7 +198,7 @@ impl Particles {
         )
         .unwrap();
         let stage_velocity_buffer = Buffer::from_iter(
-            vulkano_backend.memory_allocator().clone(),
+            memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::TRANSFER_SRC,
                 ..Default::default()
@@ -182,7 +218,7 @@ impl Particles {
             self.velocity.clone(),
             regions.to_vec(),
         );
-        vulkano_backend.execute_gpu_task(&mut stage_task);
+        task_executor.execute(&mut stage_task);
     }
 }
 

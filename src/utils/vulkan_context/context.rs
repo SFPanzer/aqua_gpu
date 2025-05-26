@@ -21,7 +21,7 @@ use vulkano::{
 };
 use winit::event_loop::EventLoop;
 
-use super::GpuTask;
+use super::{traits::GpuTaskExecutor, GpuTask};
 
 pub(crate) struct VulkanoBackend {
     instance: Arc<Instance>,
@@ -95,11 +95,13 @@ impl VulkanoBackend {
     pub fn memory_allocator(&self) -> &Arc<StandardMemoryAllocator> {
         &self.memory_allocator
     }
+}
 
-    pub fn execute_gpu_task(&self, task: &mut dyn GpuTask) {
-        let mut command_buffer_builder = self.command_buffer_builder();
-        task.record(&mut command_buffer_builder);
-        let command_buffer = command_buffer_builder.build().unwrap();
+impl GpuTaskExecutor for VulkanoBackend {
+    fn execute(&self, task: &mut dyn GpuTask) {
+        let mut builder = self.command_buffer_builder();
+        task.record(&mut builder);
+        let command_buffer = builder.build().unwrap();
         task.submit(command_buffer, &self.queue, &self.device);
     }
 }
