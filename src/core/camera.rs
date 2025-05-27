@@ -21,11 +21,11 @@ impl Camera {
 
     pub fn view_matrix(&self) -> Mat4 {
         let dir = self.rotation * -Vec3::Z;
-        let up = self.rotation * Vec3::Y;
+        let up = self.rotation * -Vec3::Y;
         Mat4::look_to_rh(self.position, dir, up)
     }
 
     pub fn projection_matrix(&self, aspect_ratio: f32) -> Mat4 {
-        Mat4::perspective_rh_gl(self.fov, aspect_ratio, self.near_plane, self.far_plane)
+        Mat4::perspective_rh(self.fov, aspect_ratio, self.near_plane, self.far_plane)
     }
 }
