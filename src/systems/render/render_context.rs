@@ -54,9 +54,8 @@ impl RenderContext {
             Surface::from_window(vulkano_backend.instance().clone(), window.clone()).unwrap();
         let (swapchain, images) = create_swapchain(vulkano_backend.device(), &window, surface);
         let viewport = Viewport {
-            offset: [0.0, 0.0],
             extent: window.inner_size().into(),
-            depth_range: 0.0..=1.0,
+            ..Default::default()
         };
         let render_pass = get_render_pass(vulkano_backend.device(), swapchain.image_format());
         let pipeline = get_render_pipeline(
@@ -123,6 +122,7 @@ impl RenderContext {
         memory_allocator: &Arc<StandardMemoryAllocator>,
     ) {
         if self.recreate_swapchain {
+            self.viewport.extent = self.window.inner_size().into();
             let (new_swapchain, new_images) = self
                 .swapchain
                 .recreate(SwapchainCreateInfo {
@@ -148,7 +148,6 @@ impl RenderContext {
                     .entry_point("main")
                     .unwrap(),
             );
-            self.viewport.extent = self.window.inner_size().into();
             self.recreate_swapchain = false;
         }
     }
