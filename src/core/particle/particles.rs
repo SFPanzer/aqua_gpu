@@ -155,7 +155,7 @@ impl Particles {
                     },
                 ]
             };
-        self.replace_particles(
+        self.replace_particles_from_init_data(
             particles_init_data,
             &regions,
             memory_allocator,
@@ -164,7 +164,7 @@ impl Particles {
         self.count = (self.count + particles_init_data.len() as u32).min(PARTICLE_MAX_COUNT);
     }
 
-    pub fn replace_particles(
+    pub fn replace_particles_from_init_data(
         &mut self,
         particles_init_data: &[ParticleInitData],
         regions: &[BufferCopy],
@@ -220,9 +220,33 @@ impl Particles {
         );
         task_executor.execute(&mut stage_task);
     }
+
+    pub fn replace_particles_from_particles(&mut self, src: &Self, task_executor: &impl GpuTaskExecutor) {
+        self.count = src.count;
+        self.cursor = src.cursor;
+        
+        if src.count() == 0 {
+            return; // No particles to swap
+        }
+        
+        let regions = [BufferCopy {
+            src_offset: 0,
+            dst_offset: 0,
+            size: src.count() as u64,
+            ..Default::default()
+        }];
+        let mut swap_task = ParticleStageTask::new(
+            src.position.clone(),
+            src.velocity.clone(),
+            self.position.clone(),
+            self.velocity.clone(),
+            regions.to_vec(),
+        );
+        task_executor.execute(&mut swap_task);
+    }
 }
 
-struct ParticleStageTask {
+pub(super) struct ParticleStageTask {
     position_src: Subbuffer<[ParticlePosition]>,
     velocity_src: Subbuffer<[ParticleVelocity]>,
     position_dst: Subbuffer<[ParticlePosition]>,
