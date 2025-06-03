@@ -85,7 +85,7 @@ impl ApplicationHandler for App {
                 self.render_system.request_recreate_swapchain();
             }
             WindowEvent::RedrawRequested => {
-                self.particles.swap();
+                self.particles.swap(self.vulkano_backend.as_ref());
                 self.update();
 
                 self.simulation_system.update(

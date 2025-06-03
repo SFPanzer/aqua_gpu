@@ -73,7 +73,10 @@ where
         descriptor_set_allocator: &Arc<StandardDescriptorSetAllocator>,
         particles: &mut Particles,
     ) {
-        if let Err(_) = self.try_bind_descriptor_set_from_cache(particles.descriptor_sets()) {
+        if self
+            .try_bind_descriptor_set_from_cache(particles.descriptor_sets())
+            .is_err()
+        {
             self.create_and_bind_descriptor_set(descriptor_set_allocator, particles)
         }
     }
