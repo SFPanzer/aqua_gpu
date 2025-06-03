@@ -4,12 +4,14 @@ layout(local_size_x = 256) in;
 
 layout(push_constant) uniform Constants
 {
+    vec4 aabb_min;
+    vec4 aabb_max;
     uint particle_count;
     float dt;
 }
 constants;
 
-layout(binding = 0) readonly buffer VelocityBuffer
+layout(binding = 0) buffer VelocityBuffer
 {
     vec4 velocities[];
 };
@@ -25,5 +27,25 @@ void main()
     if (id >= constants.particle_count)
         return;
 
-    positions[id].xyz += velocities[id].xyz * constants.dt;
+    vec4 velocity = velocities[id];
+    vec4 position = positions[id];
+
+    position += velocity * constants.dt;
+
+    for (int i = 0; i < 3; ++i)
+    {
+        if (position[i] < constants.aabb_min[i])
+        {
+            position[i] = constants.aabb_min[i];
+            velocity[i] = -velocity[i];
+        }
+        if (position[i] > constants.aabb_max[i])
+        {
+            position[i] = constants.aabb_max[i];
+            velocity[i] = -velocity[i];
+        }
+    }
+
+    positions[id] = position;
+    velocities[id] = velocity;
 }

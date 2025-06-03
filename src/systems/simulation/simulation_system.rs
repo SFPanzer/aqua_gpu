@@ -25,7 +25,7 @@ impl SimulationSystem {
 
     pub fn init(&mut self, vulkano_backend: &Rc<VulkanoBackend>) {
         self.vulkano_backend = Some(vulkano_backend.clone());
-        self.tasks = Some(SimulationTasks::new(&vulkano_backend.device()));
+        self.tasks = Some(SimulationTasks::new(vulkano_backend.device()));
     }
 
     pub fn update(
@@ -41,6 +41,7 @@ impl SimulationSystem {
 
         let tasks = self.tasks.as_mut().unwrap();
         tasks.set_constants(
+            self.config.simulation_aabb,
             particles.count(),
             dt,
             self.config.gravity,

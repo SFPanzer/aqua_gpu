@@ -71,6 +71,7 @@ impl Particles {
             memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::STORAGE_BUFFER
+                    | BufferUsage::VERTEX_BUFFER
                     | BufferUsage::TRANSFER_SRC
                     | BufferUsage::TRANSFER_DST,
                 ..Default::default()
@@ -221,14 +222,18 @@ impl Particles {
         task_executor.execute(&mut stage_task);
     }
 
-    pub fn replace_particles_from_particles(&mut self, src: &Self, task_executor: &impl GpuTaskExecutor) {
+    pub fn replace_particles_from_particles(
+        &mut self,
+        src: &Self,
+        task_executor: &impl GpuTaskExecutor,
+    ) {
         self.count = src.count;
         self.cursor = src.cursor;
-        
+
         if src.count() == 0 {
             return; // No particles to swap
         }
-        
+
         let regions = [BufferCopy {
             src_offset: 0,
             dst_offset: 0,

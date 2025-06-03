@@ -15,14 +15,12 @@ impl ParticlePingPongBuffer {
     pub fn new(memory_allocator: &Arc<StandardMemoryAllocator>) -> Self {
         let src = Particles::new(memory_allocator);
         let dst = Particles::new(memory_allocator);
-        Self {
-            src,
-            dst,
-        }
+        Self { src, dst }
     }
 
     pub fn swap(&mut self, task_executor: &impl GpuTaskExecutor) {
-        self.src.replace_particles_from_particles(&self.dst, task_executor);
+        self.src
+            .replace_particles_from_particles(&self.dst, task_executor);
     }
 
     pub fn src(&self) -> &Particles {
