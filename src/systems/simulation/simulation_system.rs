@@ -41,6 +41,7 @@ impl SimulationSystem {
 
         let tasks = self.tasks.as_mut().unwrap();
         tasks.set_constants(
+            self.config.simulation_aabb,
             particles.count(),
             dt,
             self.config.gravity,

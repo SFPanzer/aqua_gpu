@@ -71,6 +71,7 @@ impl Particles {
             memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::STORAGE_BUFFER
+                    | BufferUsage::VERTEX_BUFFER
                     | BufferUsage::TRANSFER_SRC
                     | BufferUsage::TRANSFER_DST,
                 ..Default::default()

@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use glam::{Quat, Vec3};
+use glam::{EulerRot, Quat, Vec3};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -28,7 +28,13 @@ impl App {
         let render_system = RenderSystem::new();
         let simulation_system = SimulationSystem::new(SimulationConfig::default());
 
-        let camera = Camera::new(Vec3::new(0., 0., 1.), Quat::IDENTITY, 45.0, 0.1, 100.0);
+        let camera = Camera::new(
+            Vec3::new(0., 3., 3.),
+            Quat::from_euler(EulerRot::XYZ, -45.0f32.to_radians(), 0., 0.),
+            60.,
+            0.1,
+            100.0,
+        );
         let particles = ParticlePingPongBuffer::new(vulkano_backend.memory_allocator());
 
         Self {
@@ -46,7 +52,7 @@ impl App {
         self.particles.dst().add_particles(
             &[
                 ParticleInitData {
-                    position: Vec3::new(0.5, 0.0, 0.0),
+                    position: Vec3::new(0.5, 0.0, 0.5),
                     velocitie: Vec3::new(0.0, 0.0, 0.0),
                 },
                 ParticleInitData {
@@ -54,7 +60,7 @@ impl App {
                     velocitie: Vec3::new(0.0, 0.0, 0.0),
                 },
                 ParticleInitData {
-                    position: Vec3::new(-0.5, 0.0, 0.0),
+                    position: Vec3::new(-0.5, 0., -0.5),
                     velocitie: Vec3::new(0.0, 0.0, 0.0),
                 },
             ],

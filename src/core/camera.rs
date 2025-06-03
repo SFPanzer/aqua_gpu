@@ -26,6 +26,7 @@ impl Camera {
     }
 
     pub fn projection_matrix(&self, aspect_ratio: f32) -> Mat4 {
-        Mat4::perspective_rh(self.fov, aspect_ratio, self.near_plane, self.far_plane)
+        let fov_radians = self.fov.to_radians();
+        Mat4::perspective_rh(fov_radians, aspect_ratio, self.near_plane, self.far_plane)
     }
 }

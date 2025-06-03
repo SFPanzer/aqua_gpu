@@ -92,7 +92,13 @@ impl GpuTask for RenderTask<'_> {
             )
             .unwrap();
         builder
-            .bind_vertex_buffers(0, self.particles.position().clone())
+            .bind_vertex_buffers(
+                0,
+                (
+                    self.particles.position().clone(),
+                    self.particles.velocity().clone(),
+                ),
+            )
             .unwrap();
         unsafe { builder.draw(self.particles.count(), 1, 0, 0) }.unwrap();
         builder.end_render_pass(Default::default()).unwrap();

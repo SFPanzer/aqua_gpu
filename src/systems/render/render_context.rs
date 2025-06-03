@@ -30,7 +30,11 @@ use vulkano::{
 };
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
-use crate::{core::ParticlePosition, shaders, utils::VulkanoBackend};
+use crate::{
+    core::{ParticlePosition, ParticleVelocity},
+    shaders,
+    utils::VulkanoBackend,
+};
 
 pub(crate) struct RenderContext {
     window: Arc<Window>,
@@ -220,9 +224,12 @@ fn get_render_pipeline(
     vertex_shader: EntryPoint,
     fragment_shader: EntryPoint,
 ) -> Arc<GraphicsPipeline> {
-    let vertex_input_state = ParticlePosition::per_vertex()
-        .definition(&vertex_shader)
-        .unwrap();
+    let vertex_input_state = [
+        ParticlePosition::per_vertex(),
+        ParticleVelocity::per_vertex(),
+    ]
+    .definition(&vertex_shader)
+    .unwrap();
 
     let stages = [
         PipelineShaderStageCreateInfo::new(vertex_shader.clone()),

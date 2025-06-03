@@ -8,8 +8,9 @@ pub(crate) struct ParticlePosition {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, BufferContents)]
+#[derive(Copy, Clone, Debug, BufferContents, Vertex)]
 pub(crate) struct ParticleVelocity {
+    #[format(R32G32B32A32_SFLOAT)]
     pub velocity: [f32; 4],
 }
 

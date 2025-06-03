@@ -3,7 +3,10 @@ use std::sync::Arc;
 use glam::Vec3;
 use vulkano::{descriptor_set::allocator::StandardDescriptorSetAllocator, device::Device};
 
-use crate::{core::Particles, utils::GpuTaskExecutor};
+use crate::{
+    core::{Aabb, Particles},
+    utils::GpuTaskExecutor,
+};
 
 use super::tasks::{
     ApplyGravityConstants, ApplyGravityTask, MortonHashConstants, MortonHashTask,
@@ -29,14 +32,21 @@ impl SimulationTasks {
         }
     }
 
-    pub fn set_constants(&mut self, particle_count: u32, dt: f32, gravity: Vec3, grid_size: f32) {
+    pub fn set_constants(
+        &mut self,
+        sim_aabb: Aabb,
+        particle_count: u32,
+        dt: f32,
+        gravity: Vec3,
+        grid_size: f32,
+    ) {
         let apply_gravity_constants = ApplyGravityConstants::new(particle_count, dt, gravity);
         self.apply_gravity.set_constants(apply_gravity_constants);
 
         let morton_hash_constants = MortonHashConstants::new(particle_count, grid_size);
         self.morton_hash.set_constants(morton_hash_constants);
 
-        let update_position_constants = UpdatePositionConstants::new(particle_count, dt);
+        let update_position_constants = UpdatePositionConstants::new(sim_aabb, particle_count, dt);
         self.update_position
             .set_constants(update_position_constants);
     }
