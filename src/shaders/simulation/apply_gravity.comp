@@ -4,9 +4,10 @@ layout(local_size_x = 256) in;
 
 layout(push_constant) uniform Constants
 {
+    vec4 gravity;
     uint particle_count;
     float dt;
-    vec3 gravity;
+    
 }
 constants;
 
@@ -21,5 +22,5 @@ void main()
     if (particle_id >= constants.particle_count)
         return;
 
-    velocities[particle_id].xyz += constants.gravity * constants.dt;
+    velocities[particle_id] += constants.gravity * constants.dt;
 }
