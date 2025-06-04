@@ -38,6 +38,14 @@ pub(crate) struct SphParams {
     /// Surface tension coefficient
     #[allow(dead_code)]
     pub surface_tension: f32,
+
+    // PBD specific parameters
+    /// Number of PBD solver iterations
+    pub pbd_iterations: u32,
+    /// Epsilon for PBD density constraint (to prevent division by zero and stabilize)
+    pub pbd_constraint_epsilon: f32,
+    /// Relaxation factor for PBD position correction (typically between 0.1 and 1.0)
+    pub pbd_relaxation_factor: f32,
 }
 
 impl Default for SimulationConfig {
@@ -56,7 +64,7 @@ impl Default for SimulationConfig {
             grid_size: sph_params.smoothing_radius * 0.75,
 
             sph_params,
-            max_neighbors: 64, // Limit neighborhood particle count for performance
+            max_neighbors: 32,
         }
     }
 }
@@ -65,10 +73,15 @@ impl Default for SphParams {
     fn default() -> Self {
         Self {
             particle_mass: 0.02,    // 20g per particle - suitable for fluid simulation
-            smoothing_radius: 0.2,  // 20cm - reasonable neighborhood radius
+            smoothing_radius: 0.15,
             rest_density: 1000.0,   // Water density 1000 kg/m³
             viscosity: 0.001,       // Water viscosity
             surface_tension: 0.073, // Water surface tension
+
+            // Performance optimized PBD parameters
+            pbd_iterations: 1, // Single iteration for maximum performance
+            pbd_constraint_epsilon: 1e-4, // Slightly relaxed for early exit
+            pbd_relaxation_factor: 0.5, // Higher relaxation for faster convergence in single iteration
         }
     }
 }
