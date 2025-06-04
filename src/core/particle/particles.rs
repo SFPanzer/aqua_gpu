@@ -14,7 +14,7 @@ use vulkano::{
 
 use crate::utils::{GpuTask, GpuTaskExecutor};
 
-use super::particle_data::{ParticleHashEntry, ParticlePosition, ParticleVelocity};
+use super::particle_data::{ParticlePosition, ParticleVelocity};
 
 pub(crate) type TaskId = TypeId;
 
@@ -30,7 +30,12 @@ pub(crate) struct Particles {
     cursor: u32,
     position: Subbuffer<[ParticlePosition]>,
     velocity: Subbuffer<[ParticleVelocity]>,
-    hash: Subbuffer<[ParticleHashEntry]>,
+    hash: Subbuffer<[u32]>,
+    index: Subbuffer<[u32]>,
+    hash_temp: Subbuffer<[u32]>,
+    index_temp: Subbuffer<[u32]>,
+    histograms: Subbuffer<[u32]>,
+    prefix_sums: Subbuffer<[u32]>,
     descriptor_sets: HashMap<TaskId, Arc<DescriptorSet>>,
 }
 
@@ -67,6 +72,7 @@ impl Particles {
             PARTICLE_MAX_COUNT as u64,
         )
         .unwrap();
+
         let velocity = Buffer::new_slice(
             memory_allocator.clone(),
             BufferCreateInfo {
@@ -80,13 +86,69 @@ impl Particles {
             PARTICLE_MAX_COUNT as u64,
         )
         .unwrap();
+
         let hash = Buffer::new_slice(
             memory_allocator.clone(),
             BufferCreateInfo {
                 usage: BufferUsage::STORAGE_BUFFER,
                 ..Default::default()
             },
-            allocation_create_info,
+            allocation_create_info.clone(),
+            PARTICLE_MAX_COUNT as u64,
+        )
+        .unwrap();
+
+        let index = Buffer::new_slice(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER,
+                ..Default::default()
+            },
+            allocation_create_info.clone(),
+            PARTICLE_MAX_COUNT as u64,
+        )
+        .unwrap();
+
+        let hash_temp = Buffer::new_slice(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER,
+                ..Default::default()
+            },
+            allocation_create_info.clone(),
+            PARTICLE_MAX_COUNT as u64,
+        )
+        .unwrap();
+
+        let index_temp = Buffer::new_slice(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER,
+                ..Default::default()
+            },
+            allocation_create_info.clone(),
+            PARTICLE_MAX_COUNT as u64,
+        )
+        .unwrap();
+
+        let histograms = Buffer::new_slice(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER,
+                ..Default::default()
+            },
+            allocation_create_info.clone(),
+            PARTICLE_MAX_COUNT as u64,
+        )
+        .unwrap();
+
+        let prefix_sums = Buffer::new_slice(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER,
+                ..Default::default()
+            },
+            allocation_create_info.clone(),
             PARTICLE_MAX_COUNT as u64,
         )
         .unwrap();
@@ -95,6 +157,11 @@ impl Particles {
             position,
             velocity,
             hash,
+            index,
+            hash_temp,
+            index_temp,
+            histograms,
+            prefix_sums,
             count: 0,
             cursor: 0,
             descriptor_sets: HashMap::new(),
@@ -112,16 +179,48 @@ impl Particles {
     }
 
     #[allow(unused)]
-    pub fn hash(&self) -> &Subbuffer<[ParticleHashEntry]> {
+    pub fn hash(&self) -> &Subbuffer<[u32]> {
         &self.hash
+    }
+
+    pub fn index(&self) -> &Subbuffer<[u32]> {
+        &self.index
     }
 
     pub fn count(&self) -> u32 {
         self.count
     }
 
+    pub fn histograms(&self) -> &Subbuffer<[u32]> {
+        &self.histograms
+    }
+
+    pub fn hash_temp(&self) -> &Subbuffer<[u32]> {
+        &self.hash_temp
+    }
+
+    pub fn index_temp(&self) -> &Subbuffer<[u32]> {
+        &self.index_temp
+    }
+
+    pub fn prefix_sums(&self) -> &Subbuffer<[u32]> {
+        &self.prefix_sums
+    }
+
     pub fn descriptor_sets(&mut self) -> &mut HashMap<TaskId, Arc<DescriptorSet>> {
         &mut self.descriptor_sets
+    }
+
+    /// 交换主哈希缓冲区和临时哈希缓冲区
+    #[allow(unused)]
+    pub fn swap_hash_buffers(&mut self) {
+        std::mem::swap(&mut self.hash, &mut self.hash_temp);
+    }
+
+    /// 交换主索引缓冲区和临时索引缓冲区
+    #[allow(unused)]
+    pub fn swap_index_buffers(&mut self) {
+        std::mem::swap(&mut self.index, &mut self.index_temp);
     }
 
     pub fn add_particles(

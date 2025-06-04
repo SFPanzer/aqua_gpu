@@ -1,0 +1,118 @@
+#version 450
+
+#define WORKGROUP_SIZE 256
+#define RADIX_SORT_BINS 256
+#define ELEMENTS_PER_THREAD 4
+
+layout(local_size_x = WORKGROUP_SIZE) in;
+
+layout(push_constant) uniform Constants
+{
+    uint num_particles;
+    uint shift_bits;
+    uint num_work_groups;
+    uint num_blocks_per_work_group;
+}
+constants;
+
+layout(set = 0, binding = 0) buffer HashInputBuffer
+{
+    uint hashes_in[];
+};
+
+layout(set = 0, binding = 1) buffer HashOutputBuffer
+{
+    uint hashes_out[];
+};
+
+layout(set = 0, binding = 2) buffer IndexInputBuffer
+{
+    uint indices_in[];
+};
+
+layout(set = 0, binding = 3) buffer IndexOutputBuffer
+{
+    uint indices_out[];
+};
+
+layout(set = 0, binding = 4) buffer PrefixSumBuffer
+{
+    uint prefix_sums[];
+};
+
+shared uint[RADIX_SORT_BINS] local_offsets;
+
+void main()
+{
+    uint global_id = gl_GlobalInvocationID.x;
+    uint local_id = gl_LocalInvocationID.x;
+
+    // Initialize local offsets from global prefix sums
+    if (local_id < RADIX_SORT_BINS)
+    {
+        local_offsets[local_id] = prefix_sums[local_id];
+    }
+    barrier();
+
+    // Adaptive processing based on dataset size
+    if (constants.num_particles < 25000)
+    {
+        // For small datasets: process one element per thread with multiple blocks
+        for (uint block = 0; block < constants.num_blocks_per_work_group; block++)
+        {
+            uint element_id = block * WORKGROUP_SIZE + local_id;
+            
+            if (element_id < constants.num_particles)
+            {
+                uint hash_value = hashes_in[element_id];
+                uint radix = (hash_value >> constants.shift_bits) & (RADIX_SORT_BINS - 1);
+                
+                uint destination = atomicAdd(local_offsets[radix], 1);
+                
+                if (destination < constants.num_particles)
+                {
+                    hashes_out[destination] = hash_value;
+                    indices_out[destination] = indices_in[element_id];
+                }
+            }
+        }
+    }
+    else
+    {
+        // For large datasets: process multiple elements per thread for better bandwidth
+        uint base_element_id = local_id * ELEMENTS_PER_THREAD;
+        
+        // Load multiple elements into local memory first
+        uint local_hashes[ELEMENTS_PER_THREAD];
+        uint local_indices[ELEMENTS_PER_THREAD];
+        uint local_radixes[ELEMENTS_PER_THREAD];
+        uint valid_elements = 0;
+        
+        // Coalesced memory access: load multiple elements
+        for (uint i = 0; i < ELEMENTS_PER_THREAD; i++)
+        {
+            uint element_id = base_element_id + i;
+            if (element_id < constants.num_particles)
+            {
+                local_hashes[i] = hashes_in[element_id];
+                local_indices[i] = indices_in[element_id];
+                local_radixes[i] = (local_hashes[i] >> constants.shift_bits) & (RADIX_SORT_BINS - 1);
+                valid_elements++;
+            }
+        }
+        
+        // Process all valid elements
+        for (uint i = 0; i < valid_elements; i++)
+        {
+            // Atomically get next available position for this radix
+            uint destination = atomicAdd(local_offsets[local_radixes[i]], 1);
+            
+            // Write to output buffers
+            if (destination < constants.num_particles)
+            {
+                hashes_out[destination] = local_hashes[i];
+                indices_out[destination] = local_indices[i];
+            }
+        }
+    }
+}

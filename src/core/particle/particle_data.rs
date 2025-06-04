@@ -14,12 +14,6 @@ pub(crate) struct ParticleVelocity {
     pub velocity: [f32; 4],
 }
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Default, BufferContents)]
-pub(crate) struct ParticleHashEntry {
-    pub hash: u32,
-    pub index: u32,
-}
 #[cfg(test)]
 mod tests {
     use glam::Vec3;

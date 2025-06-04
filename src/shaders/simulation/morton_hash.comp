@@ -14,15 +14,14 @@ layout(binding = 0) readonly buffer PositionBuffer
     vec4 positions[];
 };
 
-struct MortonEntry
-{
-    uint mortonCode;
-    uint index;
-};
-
 layout(binding = 1) writeonly buffer MortonBuffer
 {
-    MortonEntry mortonBuffer[];
+    uint mortons[];
+};
+
+layout(binding = 2) writeonly buffer IndexBuffer
+{
+    uint indices[];
 };
 
 uint expandBits(uint v)
@@ -41,15 +40,15 @@ uint morton3D(uvec3 grid_pos)
 
 void main()
 {
-    uint id = gl_GlobalInvocationID.x;
-    if (id >= constants.particle_count)
+    uint particle_id = gl_GlobalInvocationID.x;
+    if (particle_id >= constants.particle_count)
         return;
 
-    vec3 pos = positions[id].xyz;
+    vec3 pos = positions[particle_id].xyz;
     uvec3 grid_pos = uvec3(ivec3(floor(pos / constants.grid_size)) & 0xFFFFFFFFu);
 
     uint morton = morton3D(grid_pos);
 
-    mortonBuffer[id].mortonCode = morton;
-    mortonBuffer[id].index = id;
+    mortons[particle_id] = morton;
+    indices[particle_id] = particle_id;
 }

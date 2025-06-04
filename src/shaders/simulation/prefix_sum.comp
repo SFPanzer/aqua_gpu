@@ -1,0 +1,88 @@
+#version 450
+
+#define WORKGROUP_SIZE 256
+#define RADIX_SORT_BINS 256
+
+layout(local_size_x = WORKGROUP_SIZE) in;
+
+layout(push_constant) uniform Constants
+{
+    uint num_work_groups;
+    uint total_bins;
+}
+constants;
+
+layout(set = 0, binding = 0) buffer HistogramBuffer
+{
+    uint histograms[];
+};
+
+layout(set = 0, binding = 1) buffer PrefixSumBuffer
+{
+    uint prefix_sums[];
+};
+
+shared uint[RADIX_SORT_BINS] local_data;
+
+void main()
+{
+    uint local_id = gl_LocalInvocationID.x;
+    uint global_id = gl_GlobalInvocationID.x;
+
+    // Initialize shared memory
+    if (local_id < RADIX_SORT_BINS)
+    {
+        local_data[local_id] = 0;
+        
+        // Sum histogram values across all work groups for this bin
+        for (uint wg = 0; wg < constants.num_work_groups; wg++)
+        {
+            local_data[local_id] += histograms[wg * RADIX_SORT_BINS + local_id];
+        }
+    }
+    barrier();
+
+    // Perform inclusive prefix sum using up-sweep and down-sweep
+    // Up-sweep phase
+    uint offset = 1;
+    for (uint d = RADIX_SORT_BINS >> 1; d > 0; d >>= 1)
+    {
+        barrier();
+        if (local_id < d)
+        {
+            uint ai = offset * (2 * local_id + 1) - 1;
+            uint bi = offset * (2 * local_id + 2) - 1;
+            local_data[bi] += local_data[ai];
+        }
+        offset *= 2;
+    }
+
+    // Clear the last element for exclusive scan
+    if (local_id == 0)
+    {
+        local_data[RADIX_SORT_BINS - 1] = 0;
+    }
+    barrier();
+
+    // Down-sweep phase
+    for (uint d = 1; d < RADIX_SORT_BINS; d *= 2)
+    {
+        offset >>= 1;
+        barrier();
+        if (local_id < d)
+        {
+            uint ai = offset * (2 * local_id + 1) - 1;
+            uint bi = offset * (2 * local_id + 2) - 1;
+            uint temp = local_data[ai];
+            local_data[ai] = local_data[bi];
+            local_data[bi] += temp;
+        }
+    }
+    barrier();
+
+    // Write results - now local_data contains exclusive prefix sums
+    if (local_id < RADIX_SORT_BINS)
+    {
+        prefix_sums[local_id] = local_data[local_id];
+    }
+} 
