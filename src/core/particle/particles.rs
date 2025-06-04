@@ -36,6 +36,7 @@ pub(crate) struct Particles {
     index_temp: Subbuffer<[u32]>,
     histograms: Subbuffer<[u32]>,
     prefix_sums: Subbuffer<[u32]>,
+    density: Subbuffer<[f32]>,
     descriptor_sets: HashMap<TaskId, Arc<DescriptorSet>>,
 }
 
@@ -153,6 +154,18 @@ impl Particles {
         )
         .unwrap();
 
+        // SPH related buffers
+        let density = Buffer::new_slice(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER,
+                ..Default::default()
+            },
+            allocation_create_info.clone(),
+            PARTICLE_MAX_COUNT as u64,
+        )
+        .unwrap();
+
         Self {
             position,
             velocity,
@@ -162,6 +175,7 @@ impl Particles {
             index_temp,
             histograms,
             prefix_sums,
+            density,
             count: 0,
             cursor: 0,
             descriptor_sets: HashMap::new(),
@@ -207,17 +221,22 @@ impl Particles {
         &self.prefix_sums
     }
 
+    // SPH related buffer accessors
+    pub fn density(&self) -> &Subbuffer<[f32]> {
+        &self.density
+    }
+
     pub fn descriptor_sets(&mut self) -> &mut HashMap<TaskId, Arc<DescriptorSet>> {
         &mut self.descriptor_sets
     }
 
-    /// 交换主哈希缓冲区和临时哈希缓冲区
+    /// Swap main hash buffer and temporary hash buffer
     #[allow(unused)]
     pub fn swap_hash_buffers(&mut self) {
         std::mem::swap(&mut self.hash, &mut self.hash_temp);
     }
 
-    /// 交换主索引缓冲区和临时索引缓冲区
+    /// Swap main index buffer and temporary index buffer
     #[allow(unused)]
     pub fn swap_index_buffers(&mut self) {
         std::mem::swap(&mut self.index, &mut self.index_temp);

@@ -12,10 +12,9 @@ use super::compute_task::{ComputeGpuTask, ComputeGpuTaskConstants};
 #[repr(C)]
 #[derive(Clone, Copy, Debug, BufferContents)]
 pub struct ApplyGravityConstants {
+    gravity: [f32; 4],
     particle_count: u32,
     dt: f32,
-    _padding: [f32; 2],
-    gravity: [f32; 3],
 }
 
 impl ApplyGravityConstants {
@@ -23,8 +22,7 @@ impl ApplyGravityConstants {
         Self {
             particle_count,
             dt,
-            _padding: [0.0; 2],
-            gravity: gravity.into(),
+            gravity: gravity.extend(0.0).into(),
         }
     }
 }
@@ -92,8 +90,7 @@ mod tests {
         let constant = ApplyGravityConstants {
             particle_count: particles.count(),
             dt: 0.1,
-            _padding: [0.0; 2],
-            gravity: [1.0, 2.0, 3.0],
+            gravity: [1.0, 2.0, 3.0, 0.0],
         };
 
         let mut task = ApplyGravityTask::new(backend.device());

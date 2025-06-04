@@ -156,7 +156,7 @@ mod tests {
 
         // Verify that hashes are sorted (at least partially for the first 8 bits)
         let result_hashes = particles.hash_temp().read().unwrap();
-        let result_indices = particles.index_temp().read().unwrap();
+        let _result_indices = particles.index_temp().read().unwrap();
 
         // Check that the sort produced valid results
         println!(
@@ -166,7 +166,6 @@ mod tests {
         );
         // 缓冲区大小是固定的，所以只检查前面粒子数量的元素
         let hash_slice = &result_hashes[..particles.count() as usize];
-        let index_slice = &result_indices[..particles.count() as usize];
 
         // Verify that the first 8 bits are sorted
         for i in 1..particles.count() as usize {
