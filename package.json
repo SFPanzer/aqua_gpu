@@ -7,7 +7,7 @@
     "check_format": "cargo fmt --check",
     "clippy": "cargo clippy",
     "run": "cargo run",
-    "test": "cargo test",
+    "test": "cargo test -- --test-threads=1 --nocapture",
     "build": "cargo build"
   },
   "repository": {

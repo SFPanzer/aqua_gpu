@@ -42,6 +42,7 @@ impl ComputeGpuTaskConstants for MortonHashConstants {
         [
             WriteDescriptorSet::buffer(0, particles.position().clone()),
             WriteDescriptorSet::buffer(1, particles.hash().clone()),
+            WriteDescriptorSet::buffer(2, particles.index().clone()),
         ]
     }
 
@@ -56,7 +57,7 @@ pub(crate) type MortonHashTask = ComputeGpuTask<MortonHashConstants>;
 mod tests {
 
     use crate::{
-        core::{ParticleHashEntry, ParticleInitData, Particles},
+        core::{ParticleInitData, Particles},
         systems::simulation::tasks::{morton_hash::MortonHashConstants, MortonHashTask},
         utils::GpuTaskExecutor,
     };
@@ -100,23 +101,13 @@ mod tests {
 
         let result_entries = particles.hash().read().unwrap();
         let expected_entries = vec![
-            ParticleHashEntry {
-                hash: 0b0100_1001_0010_0100_1001_0010_0100_1001,
-                index: 0,
-            },
-            ParticleHashEntry {
-                hash: 0b1001_0010_0100_1001_0010_0100_1001_0010,
-                index: 1,
-            },
-            ParticleHashEntry {
-                hash: 0b0010_0100_1001_0010_0100_1001_0010_0100,
-                index: 2,
-            },
+            0b0100_1001_0010_0100_1001_0010_0100_1001u32,
+            0b1001_0010_0100_1001_0010_0100_1001_0010u32,
+            0b0010_0100_1001_0010_0100_1001_0010_0100u32,
         ];
         assert_eq!(particles.count() as usize, expected_entries.len());
         for (r, e) in result_entries.iter().zip(expected_entries.iter()) {
-            assert_eq!(r.hash, e.hash);
-            assert_eq!(r.index, e.index);
+            assert_eq!(r, e);
         }
     }
 }

@@ -23,12 +23,12 @@ layout(binding = 1) buffer PositionBuffer
 
 void main()
 {
-    uint id = gl_GlobalInvocationID.x;
-    if (id >= constants.particle_count)
+    uint particle_id = gl_GlobalInvocationID.x;
+    if (particle_id >= constants.particle_count)
         return;
 
-    vec4 velocity = velocities[id];
-    vec4 position = positions[id];
+    vec4 velocity = velocities[particle_id];
+    vec4 position = positions[particle_id];
 
     position += velocity * constants.dt;
 
@@ -46,6 +46,6 @@ void main()
         }
     }
 
-    positions[id] = position;
-    velocities[id] = velocity;
+    positions[particle_id] = position;
+    velocities[particle_id] = velocity;
 }
