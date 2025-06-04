@@ -48,6 +48,7 @@ impl SimulationSystem {
             descriptor_set_allocator,
             particles,
             self.vulkano_backend.as_ref().unwrap().as_ref(),
+            &self.config,
         );
     }
 }
@@ -137,6 +138,7 @@ mod tests {
                     &headless_backend.descriptor_set_allocator(),
                     &mut particles,
                     &headless_backend,
+                    &config,
                 );
 
                 if frame == 0 {
@@ -164,6 +166,11 @@ mod tests {
                     .map(|t| t.sph_density_time)
                     .sum::<Duration>()
                     / frames_to_test as u32;
+                let total_pbd = step_timings
+                    .iter()
+                    .map(|t| t.pbd_constraint_time)
+                    .sum::<Duration>()
+                    / frames_to_test as u32;
                 let total_gravity = step_timings
                     .iter()
                     .map(|t| t.gravity_time)
@@ -181,6 +188,7 @@ mod tests {
                     morton_hash_time: total_morton,
                     radix_sort_time: total_sort,
                     sph_density_time: total_sph,
+                    pbd_constraint_time: total_pbd,
                     gravity_time: total_gravity,
                     position_update_time: total_position,
                     total_time: total_frame,

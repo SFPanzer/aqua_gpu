@@ -37,6 +37,7 @@ pub(crate) struct Particles {
     histograms: Subbuffer<[u32]>,
     prefix_sums: Subbuffer<[u32]>,
     density: Subbuffer<[f32]>,
+    predicted_position: Subbuffer<[ParticlePosition]>,
     descriptor_sets: HashMap<TaskId, Arc<DescriptorSet>>,
 }
 
@@ -166,6 +167,21 @@ impl Particles {
         )
         .unwrap();
 
+        // 新增: 初始化predicted_position缓冲区
+        let predicted_position = Buffer::new_slice(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER
+                    | BufferUsage::VERTEX_BUFFER
+                    | BufferUsage::TRANSFER_SRC
+                    | BufferUsage::TRANSFER_DST, // 允许作为复制目标
+                ..Default::default()
+            },
+            allocation_create_info.clone(),
+            PARTICLE_MAX_COUNT as u64,
+        )
+        .unwrap();
+
         Self {
             position,
             velocity,
@@ -176,6 +192,7 @@ impl Particles {
             histograms,
             prefix_sums,
             density,
+            predicted_position, // 新增
             count: 0,
             cursor: 0,
             descriptor_sets: HashMap::new(),
@@ -224,6 +241,12 @@ impl Particles {
     // SPH related buffer accessors
     pub fn density(&self) -> &Subbuffer<[f32]> {
         &self.density
+    }
+
+    // 新增: predicted_position访问器
+    #[allow(unused)]
+    pub fn predicted_position(&self) -> &Subbuffer<[ParticlePosition]> {
+        &self.predicted_position
     }
 
     pub fn descriptor_sets(&mut self) -> &mut HashMap<TaskId, Arc<DescriptorSet>> {
@@ -367,6 +390,27 @@ impl Particles {
         );
         task_executor.execute(&mut swap_task);
     }
+
+    // 新增: 将position复制到predicted_position
+    pub fn copy_position_to_predicted(&mut self, task_executor: &impl GpuTaskExecutor) {
+        if self.count == 0 {
+            return;
+        }
+
+        let regions = [BufferCopy {
+            src_offset: 0,
+            dst_offset: 0,
+            size: self.count() as u64,
+            ..Default::default()
+        }];
+
+        let mut copy_task = PositionCopyTask::new(
+            self.position.clone(),
+            self.predicted_position.clone(),
+            regions.to_vec(),
+        );
+        task_executor.execute(&mut copy_task);
+    }
 }
 
 pub(super) struct ParticleStageTask {
@@ -406,6 +450,45 @@ impl GpuTask for ParticleStageTask {
 
         builder.copy_buffer(copy_positions_info).unwrap();
         builder.copy_buffer(copy_velocities_info).unwrap();
+    }
+
+    fn submit(
+        &mut self,
+        command_buffer: Arc<PrimaryAutoCommandBuffer>,
+        queue: &Arc<Queue>,
+        device: &Arc<Device>,
+    ) {
+        let future = sync::now(device.clone())
+            .then_execute(queue.clone(), command_buffer)
+            .unwrap()
+            .then_signal_fence_and_flush()
+            .unwrap();
+        future.wait(None).unwrap();
+    }
+}
+
+// 新增: PositionCopyTask，用于在GPU上复制位置数据
+pub(super) struct PositionCopyTask {
+    src: Subbuffer<[ParticlePosition]>,
+    dst: Subbuffer<[ParticlePosition]>,
+    regions: Vec<BufferCopy>,
+}
+
+impl PositionCopyTask {
+    pub fn new(
+        src: Subbuffer<[ParticlePosition]>,
+        dst: Subbuffer<[ParticlePosition]>,
+        regions: Vec<BufferCopy>,
+    ) -> Self {
+        Self { src, dst, regions }
+    }
+}
+
+impl GpuTask for PositionCopyTask {
+    fn record(&self, builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>) {
+        let mut copy_info = CopyBufferInfoTyped::buffers(self.src.clone(), self.dst.clone());
+        copy_info.regions = self.regions.clone().into();
+        builder.copy_buffer(copy_info).unwrap();
     }
 
     fn submit(
