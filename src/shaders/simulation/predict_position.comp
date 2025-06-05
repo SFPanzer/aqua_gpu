@@ -1,0 +1,45 @@
+#version 450
+
+layout(local_size_x = 256) in;
+
+layout(push_constant) uniform Constants
+{
+    vec4 aabb_min;
+    vec4 aabb_max;
+    uint particle_count;
+    float dt;
+}
+constants;
+
+layout(set = 0, binding = 0) readonly buffer PositionBuffer
+{
+    vec4 positions[];
+};
+
+layout(set = 0, binding = 1) readonly buffer VelocityBuffer
+{
+    vec4 velocities[];
+};
+
+layout(set = 0, binding = 2) writeonly buffer PredictedPositionBuffer
+{
+    vec4 predicted_positions[];
+};
+
+void main()
+{
+    uint particle_id = gl_GlobalInvocationID.x;
+    if (particle_id >= constants.particle_count)
+        return;
+
+    vec4 current_pos = positions[particle_id];
+    vec4 velocity = velocities[particle_id];
+    
+    // 预测积分：predicted_position = position + velocity * dt
+    vec4 predicted_pos = current_pos + velocity * constants.dt;
+
+    vec4 clamped_pos = clamp(predicted_pos, constants.aabb_min, constants.aabb_max);
+    vec4 delta_pos = clamped_pos - predicted_pos;
+    
+    predicted_positions[particle_id] = clamped_pos + delta_pos;
+} 

@@ -40,7 +40,7 @@ impl ComputeGpuTaskConstants for MortonHashConstants {
         particles: &crate::core::Particles,
     ) -> impl IntoIterator<Item = WriteDescriptorSet> {
         [
-            WriteDescriptorSet::buffer(0, particles.position().clone()),
+            WriteDescriptorSet::buffer(0, particles.predicted_position().clone()),
             WriteDescriptorSet::buffer(1, particles.hash().clone()),
             WriteDescriptorSet::buffer(2, particles.index().clone()),
         ]
@@ -58,7 +58,10 @@ mod tests {
 
     use crate::{
         core::{ParticleInitData, Particles},
-        systems::simulation::tasks::{morton_hash::MortonHashConstants, MortonHashTask},
+        systems::simulation::tasks::{
+            morton_hash::MortonHashConstants, MortonHashTask, PredictPositionConstants,
+            PredictPositionTask,
+        },
         utils::GpuTaskExecutor,
     };
 
@@ -74,15 +77,15 @@ mod tests {
             &[
                 ParticleInitData {
                     position: Vec3::new(-1.0, 0.0, 0.0),
-                    velocitie: Vec3::new(0.0, 0.0, 0.0),
+                    velocity: Vec3::new(0.0, 0.0, 0.0),
                 },
                 ParticleInitData {
                     position: Vec3::new(0.0, -1.0, 0.0),
-                    velocitie: Vec3::new(0.0, 0.0, 0.0),
+                    velocity: Vec3::new(0.0, 0.0, 0.0),
                 },
                 ParticleInitData {
                     position: Vec3::new(0.0, 0.0, -1.0),
-                    velocitie: Vec3::new(0.0, 0.0, 0.0),
+                    velocity: Vec3::new(0.0, 0.0, 0.0),
                 },
             ],
             backend.memory_allocator(),
@@ -93,6 +96,20 @@ mod tests {
             particle_count: particles.count(),
             grid_size: 1.0,
         };
+
+        let predict_pos_constants = PredictPositionConstants::new(
+            particles.count(),
+            0.1,
+            crate::core::Aabb::new(
+                glam::Vec3::new(-1.0, -1.0, -1.0),
+                glam::Vec3::new(1.0, 1.0, 1.0),
+            ),
+        );
+        let mut predict_pos_task = PredictPositionTask::new(backend.device());
+        predict_pos_task.set_constants(predict_pos_constants);
+        predict_pos_task.update_descriptor_set(&backend.descriptor_set_allocator(), &mut particles);
+        backend.execute(&mut predict_pos_task);
+
         let mut task = MortonHashTask::new(backend.device());
         task.set_constants(constants);
         task.update_descriptor_set(&backend.descriptor_set_allocator(), &mut particles);

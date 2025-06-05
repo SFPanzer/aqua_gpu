@@ -112,23 +112,23 @@ mod tests {
             &[
                 ParticleInitData {
                     position: Vec3::new(2.0, 0.0, 0.0),
-                    velocitie: Vec3::new(0.0, 0.0, 0.0),
+                    velocity: Vec3::new(0.0, 0.0, 0.0),
                 },
                 ParticleInitData {
                     position: Vec3::new(1.0, 1.0, 0.0),
-                    velocitie: Vec3::new(0.0, 0.0, 0.0),
+                    velocity: Vec3::new(0.0, 0.0, 0.0),
                 },
                 ParticleInitData {
                     position: Vec3::new(0.0, 2.0, 0.0),
-                    velocitie: Vec3::new(0.0, 0.0, 0.0),
+                    velocity: Vec3::new(0.0, 0.0, 0.0),
                 },
                 ParticleInitData {
                     position: Vec3::new(0.0, 0.0, 2.0),
-                    velocitie: Vec3::new(0.0, 0.0, 0.0),
+                    velocity: Vec3::new(0.0, 0.0, 0.0),
                 },
                 ParticleInitData {
                     position: Vec3::new(-1.0, -1.0, -1.0),
-                    velocitie: Vec3::new(0.0, 0.0, 0.0),
+                    velocity: Vec3::new(0.0, 0.0, 0.0),
                 },
             ],
             backend.memory_allocator(),

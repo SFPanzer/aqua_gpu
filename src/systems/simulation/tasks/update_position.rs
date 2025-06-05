@@ -48,6 +48,7 @@ impl ComputeGpuTaskConstants for UpdatePositionConstants {
         [
             WriteDescriptorSet::buffer(0, particles.velocity().clone()),
             WriteDescriptorSet::buffer(1, particles.position().clone()),
+            WriteDescriptorSet::buffer(2, particles.predicted_position().clone()),
         ]
     }
 
@@ -79,20 +80,29 @@ mod tests {
             &[
                 ParticleInitData {
                     position: Vec3::new(0.0, 0.0, 0.0),
-                    velocitie: Vec3::new(1.0, 0.0, 0.0),
+                    velocity: Vec3::new(1.0, 0.0, 0.0),
                 },
                 ParticleInitData {
                     position: Vec3::new(0.0, 0.0, 0.0),
-                    velocitie: Vec3::new(0.0, 1.0, 0.0),
+                    velocity: Vec3::new(0.0, 1.0, 0.0),
                 },
                 ParticleInitData {
                     position: Vec3::new(0.0, 0.0, 0.0),
-                    velocitie: Vec3::new(0.0, 0.0, 1.0),
+                    velocity: Vec3::new(0.0, 0.0, 1.0),
                 },
             ],
             backend.memory_allocator(),
             &backend,
         );
+
+        particles.copy_position_to_predicted(&backend);
+
+        {
+            let mut predicted_pos = particles.predicted_position().write().unwrap();
+            predicted_pos[0].position[0] = 0.1;
+            predicted_pos[1].position[1] = 0.1;
+            predicted_pos[2].position[2] = 0.1;
+        }
 
         let constant = UpdatePositionConstants {
             aabb_min: [-1., -1., -1., 0.],
@@ -124,6 +134,16 @@ mod tests {
                     b
                 );
             }
+        }
+
+        let velocity_entries = particles.velocity().read().unwrap();
+        for i in 0..3 {
+            assert!(
+                approx_eq(velocity_entries[i].velocity[i], 1.0, 1e-5),
+                "Velocity component {} should be 1.0, but got {}",
+                i,
+                velocity_entries[i].velocity[i]
+            );
         }
     }
 }

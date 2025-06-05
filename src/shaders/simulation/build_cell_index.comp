@@ -1,0 +1,61 @@
+#version 450
+
+layout(local_size_x = 256) in;
+
+layout(push_constant) uniform Constants
+{
+    uint particle_count;
+} constants;
+
+layout(binding = 0) readonly buffer SortedHashBuffer
+{
+    uint sorted_hashes[];
+};
+
+layout(binding = 1) writeonly buffer CellStartBuffer
+{
+    uint cell_start[];
+};
+
+layout(binding = 2) writeonly buffer CellEndBuffer
+{
+    uint cell_end[];
+};
+
+shared uint local_cell_flags[256];
+
+void main()
+{
+    uint global_index = gl_GlobalInvocationID.x;
+    uint local_index = gl_LocalInvocationIndex;
+    
+    uint cells_per_group = (65536 + gl_NumWorkGroups.x - 1) / gl_NumWorkGroups.x;
+    uint cell_start_idx = gl_WorkGroupID.x * cells_per_group;
+    uint cell_end_idx = min(cell_start_idx + cells_per_group, 65536u);
+    
+    for (uint cell_idx = cell_start_idx + local_index; cell_idx < cell_end_idx; cell_idx += gl_WorkGroupSize.x)
+    {
+        cell_start[cell_idx] = 0xFFFFFFFFu;
+        cell_end[cell_idx] = 0xFFFFFFFFu;
+    }
+    
+    barrier();
+    
+    if (gl_WorkGroupID.x == 0 && global_index < constants.particle_count)
+    {
+        // Get the low 16 bits of current hash as cell index
+        uint current_cell = sorted_hashes[global_index] & 0xFFFFu;
+        
+        // Check if this is the first particle in this cell
+        if (global_index == 0 || (sorted_hashes[global_index - 1] & 0xFFFFu) != current_cell)
+        {
+            cell_start[current_cell] = global_index;
+        }
+        
+        // Check if this is the last particle in this cell
+        if (global_index == constants.particle_count - 1 || (sorted_hashes[global_index + 1] & 0xFFFFu) != current_cell)
+        {
+            cell_end[current_cell] = global_index + 1; // end is exclusive
+        }
+    }
+} 

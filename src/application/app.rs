@@ -20,17 +20,18 @@ pub struct App {
     simulation_system: SimulationSystem,
     camera: Camera,
     particles: ParticlePingPongBuffer,
+    frame_count: u32,
 }
 
 impl App {
     pub fn new(event_loop: &EventLoop<()>) -> Self {
         let vulkano_backend = VulkanoBackend::new(event_loop);
         let render_system = RenderSystem::new();
-        let simulation_system = SimulationSystem::new(SimulationConfig::default());
+        let simulation_system = SimulationSystem::new(SimulationConfig::fountain_spray());
 
         let camera = Camera::new(
-            Vec3::new(0., 3., 3.),
-            Quat::from_euler(EulerRot::XYZ, -45.0f32.to_radians(), 0., 0.),
+            Vec3::new(0.0, 0.8, 1.0),
+            Quat::from_euler(EulerRot::XYZ, -45.0f32.to_radians(), 0.0, 0.0),
             60.,
             0.1,
             100.0,
@@ -43,33 +44,27 @@ impl App {
             simulation_system,
             camera,
             particles,
+            frame_count: 0,
         }
     }
 
     pub fn init(&mut self, event_loop: &ActiveEventLoop) {
         self.simulation_system.init(&self.vulkano_backend);
         self.render_system.init(event_loop, &self.vulkano_backend);
+    }
+
+    pub fn update(&mut self) {
+        self.frame_count += 1;
+
         self.particles.dst().add_particles(
-            &[
-                ParticleInitData {
-                    position: Vec3::new(0.5, 0.0, 0.5),
-                    velocitie: Vec3::new(0.0, 0.0, 0.0),
-                },
-                ParticleInitData {
-                    position: Vec3::new(0.0, 0.5, 0.0),
-                    velocitie: Vec3::new(0.0, 0.0, 0.0),
-                },
-                ParticleInitData {
-                    position: Vec3::new(-0.5, 0., -0.5),
-                    velocitie: Vec3::new(0.0, 0.0, 0.0),
-                },
-            ],
+            &[ParticleInitData {
+                position: Vec3::new(0.0, 0.0, 0.0),
+                velocity: Vec3::new(0.0, 0.0, 0.0),
+            }],
             self.vulkano_backend.memory_allocator(),
             self.vulkano_backend.as_ref(),
         );
     }
-
-    pub fn update(&mut self) {}
 }
 
 impl ApplicationHandler for App {

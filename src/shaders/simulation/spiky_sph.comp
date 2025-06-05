@@ -8,15 +8,15 @@ layout(push_constant) uniform Constants
     float mass;
     float smoothing_radius;
     float smoothing_radius_sq;
-    float poly6_kernel_factor;
+    float spiky_kernel_factor;  // 改为使用Spiky核
     float grid_size;
     uint max_neighbors; // 最大邻域粒子数，设为64
 }
 constants;
 
-layout(binding = 0) buffer PositionBuffer
+layout(binding = 0) readonly buffer PredictedPositionBuffer
 {
-    vec4 positions[];
+    vec4 predicted_positions[];
 };
 
 layout(binding = 1) writeonly buffer DensityBuffer
@@ -29,17 +29,23 @@ layout(binding = 2) readonly buffer SortedIndexBuffer
     uint sorted_indices[];
 };
 
-layout(binding = 3) readonly buffer HashBuffer
+layout(binding = 3) readonly buffer CellStartBuffer
 {
-    uint hashes[];
+    uint cell_start[];
 };
 
-// Poly6 kernel for density calculation
-float poly6_kernel(float r_sq, float h_sq)
+layout(binding = 4) readonly buffer CellEndBuffer
 {
-    if (r_sq >= h_sq) return 0.0;
-    float diff = h_sq - r_sq;
-    return constants.poly6_kernel_factor * diff * diff * diff;
+    uint cell_end[];
+};
+
+// Spiky kernel for density calculation - 与PBD约束保持一致
+// 参考博客中的公式：W_spiky(r, h) = 15 / (π * h^6) * (h - |r|)^3 if |r| < h, 0 otherwise
+float spiky_kernel(float r, float h)
+{
+    if (r >= h) return 0.0;
+    float h_minus_r = h - r;
+    return constants.spiky_kernel_factor * h_minus_r * h_minus_r * h_minus_r;
 }
 
 // Morton编码函数
@@ -57,11 +63,11 @@ uint morton3D(uvec3 grid_pos)
     return (expandBits(grid_pos.x) << 0) | (expandBits(grid_pos.y) << 1) | (expandBits(grid_pos.z) << 2);
 }
 
-// 计算当前粒子的Morton码
-uint calculateMortonCode(vec3 pos)
+// 计算给定3D网格位置的Morton码
+uint calculateMortonCode(ivec3 grid_pos)
 {
-    uvec3 grid_pos = uvec3(ivec3(floor(pos / constants.grid_size)) & 0xFFFFFFFFu);
-    return morton3D(grid_pos);
+    uvec3 pos = uvec3(grid_pos & 0xFFFFFFFF);
+    return morton3D(pos);
 }
 
 void main()
@@ -70,57 +76,84 @@ void main()
     if (i >= constants.particle_count)
         return;
 
-    vec3 pos_i = positions[i].xyz;
-    float density = 0.0;
+    vec3 pos_i = predicted_positions[i].xyz;
+    
+    // 添加自密度贡献：每个粒子对自己的密度贡献
+    // 在核函数中心(r=0)处的值是最大值
+    float density = constants.mass * spiky_kernel(0.0, constants.smoothing_radius);
     uint neighbors_checked = 0;
     
-    // 确保使用hashes缓冲区以避免编译器优化掉绑定点
-    uint dummy_hash = (i < constants.particle_count) ? hashes[i] : 0u;
+    // 计算当前粒子所在的网格位置
+    ivec3 grid_pos = ivec3(floor(pos_i / constants.grid_size));
     
-    // 使用排序后的数据进行邻域搜索，限制最多检查max_neighbors个粒子
-    uint search_count = min(constants.max_neighbors, constants.particle_count);
+    // 优化的cell遍历顺序：按距离优先
+    // 1. 先处理自己的cell (0,0,0) - 最重要的邻居
+    // 2. 再处理面邻居 (±1,0,0), (0,±1,0), (0,0,±1) - 6个
+    // 3. 然后处理边邻居 - 12个  
+    // 4. 最后处理角邻居 (±1,±1,±1) - 8个
     
-    // 策略1：均匀采样排序后的数组
-    if (constants.particle_count <= constants.max_neighbors)
-    {
-        // 如果粒子总数小于等于最大邻域数，检查所有粒子
-        for (uint j_idx = 0; j_idx < constants.particle_count; j_idx++)
-        {
-            uint j = sorted_indices[j_idx];
-            vec3 pos_j = positions[j].xyz;
-            vec3 r_vec = pos_i - pos_j;
-            float r_sq = dot(r_vec, r_vec);
-            
-            if (r_sq < constants.smoothing_radius_sq)
-            {
-                density += constants.mass * poly6_kernel(r_sq, constants.smoothing_radius_sq);
-            }
-        }
-    }
-    else
-    {
-        // 使用步进采样，优先检查空间上相近的粒子
-        uint step = constants.particle_count / search_count;
-        if (step == 0) step = 1;
+    // 定义按优先级排序的cell偏移
+    const int cell_offsets[27][3] = {
+        // 自己的cell (距离=0)
+        {0, 0, 0},
         
-        for (uint search_idx = 0; search_idx < search_count; search_idx++)
+        // 面邻居 (距离=1, 6个)
+        {-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1},
+        
+        // 边邻居 (距离=√2, 12个)
+        {-1, -1, 0}, {-1, 1, 0}, {1, -1, 0}, {1, 1, 0},
+        {-1, 0, -1}, {-1, 0, 1}, {1, 0, -1}, {1, 0, 1},
+        {0, -1, -1}, {0, -1, 1}, {0, 1, -1}, {0, 1, 1},
+        
+        // 角邻居 (距离=√3, 8个)
+        {-1, -1, -1}, {-1, -1, 1}, {-1, 1, -1}, {-1, 1, 1},
+        {1, -1, -1}, {1, -1, 1}, {1, 1, -1}, {1, 1, 1}
+    };
+    
+    // 按优先级顺序搜索所有27个cell
+    for (int cell_idx = 0; cell_idx < 27 && neighbors_checked < constants.max_neighbors; cell_idx++)
+    {
+        // 计算目标cell的网格位置
+        ivec3 neighbor_grid = grid_pos + ivec3(
+            cell_offsets[cell_idx][0],
+            cell_offsets[cell_idx][1], 
+            cell_offsets[cell_idx][2]
+        );
+        
+        // 计算Morton码并取低16位作为cell索引
+        uint morton_code = calculateMortonCode(neighbor_grid);
+        uint cell_index = morton_code & 0xFFFFu;
+        
+        // 获取该cell中粒子的范围
+        uint start_idx = cell_start[cell_index];
+        uint end_idx = cell_end[cell_index];
+        
+        // 检查cell范围的有效性
+        if (start_idx == 0xFFFFFFFFu || end_idx == 0xFFFFFFFFu || start_idx >= end_idx)
+            continue;
+            
+        // 遍历该cell中的所有粒子
+        for (uint idx = start_idx; idx < end_idx && neighbors_checked < constants.max_neighbors; idx++)
         {
-            uint j_idx = (search_idx * step) % constants.particle_count;
-            uint j = sorted_indices[j_idx];
-            
-            vec3 pos_j = positions[j].xyz;
+            if (idx >= constants.particle_count)
+                break;
+                
+            uint j = sorted_indices[idx];
+            if (j >= constants.particle_count || j == i)  // 跳过自身，因为已经添加了自密度贡献
+                continue;
+                
+            vec3 pos_j = predicted_positions[j].xyz;
             vec3 r_vec = pos_i - pos_j;
-            float r_sq = dot(r_vec, r_vec);
+            float r = length(r_vec);
             
-            if (r_sq < constants.smoothing_radius_sq)
+            if (r < constants.smoothing_radius)
             {
-                density += constants.mass * poly6_kernel(r_sq, constants.smoothing_radius_sq);
+                density += constants.mass * spiky_kernel(r, constants.smoothing_radius);
             }
+            
+            neighbors_checked++;
         }
     }
-    
-    // 将dummy_hash加入density以确保hashes被使用（但影响极小）
-    density += float(dummy_hash) * 1e-10;
     
     // Store density for PBD constraint solving
     densities[i] = density;

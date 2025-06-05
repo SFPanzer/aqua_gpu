@@ -21,31 +21,58 @@ layout(binding = 1) buffer PositionBuffer
     vec4 positions[];
 };
 
+layout(binding = 2) readonly buffer PredictedPositionBuffer
+{
+    vec4 predicted_positions[];
+};
+
 void main()
 {
     uint particle_id = gl_GlobalInvocationID.x;
     if (particle_id >= constants.particle_count)
         return;
 
+    vec4 old_position = positions[particle_id];
+    vec4 new_position = predicted_positions[particle_id];
     vec4 velocity = velocities[particle_id];
-    vec4 position = positions[particle_id];
-
-    position += velocity * constants.dt;
-
+    
+    // 超出边界按距离往回推的边界约束
+    bool hit_boundary = false;
     for (int i = 0; i < 3; ++i)
     {
-        if (position[i] < constants.aabb_min[i])
+        if (new_position[i] < constants.aabb_min[i])
         {
-            position[i] = constants.aabb_min[i];
-            velocity[i] = -velocity[i];
+            // 计算超出边界的距离
+            float overshoot = constants.aabb_min[i] - new_position[i];
+            // 往回推相同距离：boundary + overshoot
+            new_position[i] = constants.aabb_min[i] + overshoot;
+            // 反弹速度
+            velocity[i] = -velocity[i] * 0.7; // 保留70%的反弹能量
+            hit_boundary = true;
         }
-        if (position[i] > constants.aabb_max[i])
+        if (new_position[i] > constants.aabb_max[i])
         {
-            position[i] = constants.aabb_max[i];
-            velocity[i] = -velocity[i];
+            // 计算超出边界的距离
+            float overshoot = new_position[i] - constants.aabb_max[i];
+            // 往回推相同距离：boundary - overshoot
+            new_position[i] = constants.aabb_max[i] - overshoot;
+            // 反弹速度
+            velocity[i] = -velocity[i] * 0.7; // 保留70%的反弹能量
+            hit_boundary = true;
         }
     }
+    
+    // 只有在没有碰到边界的情况下才使用PBD标准速度更新
+    // 这样可以保持初始速度的有效性
+    if (!hit_boundary && constants.dt > 0.0) {
+        vec3 position_change = new_position.xyz - old_position.xyz;
+        // PBD标准速度更新：velocity = position_change / dt
+        // 但是用混合的方式，保留一部分原速度
+        vec3 pbd_velocity = position_change / constants.dt;
+        velocity.xyz = mix(velocity.xyz, pbd_velocity, 0.7); // 70%使用PBD速度，30%保留原速度
+    }
 
-    positions[particle_id] = position;
+    // 更新位置和速度
+    positions[particle_id] = new_position;
     velocities[particle_id] = velocity;
 }

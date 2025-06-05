@@ -92,7 +92,11 @@ impl RenderSystem {
 
         self.fps_counter.tick();
         let fps = self.fps_counter.fps();
-        window.set_title(&format!("Aqua GPU -FPS: {}", fps as u32));
+        window.set_title(&format!(
+            "Aqua GPU -FPS: {} - Particles: {}",
+            fps as u32,
+            particles.count() * 9
+        ));
     }
 
     pub fn request_redraw(&mut self) {

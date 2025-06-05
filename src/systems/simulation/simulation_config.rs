@@ -53,15 +53,15 @@ impl Default for SimulationConfig {
         let sph_params = SphParams::default();
 
         Self {
-            simulation_aabb: Aabb::new(Vec3::new(-2.0, -2.0, -2.0), Vec3::new(2.0, 2.0, 2.0)),
+            simulation_aabb: Aabb::new(Vec3::new(-1.0, -1.0, -1.0), Vec3::new(1.0, 1.0, 1.0)),
             gravity: Vec3::new(0.0, -9.81, 0.0),
 
             // Time step limits - ensure numerical stability
-            max_time_step: 1.0 / 30.0, // Maximum 33ms, prevent large time jumps
-            min_time_step: 1.0 / 240.0, // Minimum 4ms, prevent too small time steps
+            max_time_step: 1.0 / 60.0, // Maximum 16ms, smaller steps for stability
+            min_time_step: 1.0 / 300.0, // Minimum 3ms, prevent too small time steps
 
             // grid_size should be around 0.5-1.0 times smoothing_radius for balance between accuracy and performance
-            grid_size: sph_params.smoothing_radius * 0.75,
+            grid_size: sph_params.smoothing_radius * 0.8,
 
             sph_params,
             max_neighbors: 32,
@@ -72,16 +72,16 @@ impl Default for SimulationConfig {
 impl Default for SphParams {
     fn default() -> Self {
         Self {
-            particle_mass: 0.02,    // 20g per particle - suitable for fluid simulation
-            smoothing_radius: 0.15,
-            rest_density: 1000.0,   // Water density 1000 kg/m³
+            particle_mass: 0.001,   // 1g per particle - lighter for stability
+            smoothing_radius: 0.1,  // Smaller radius for 1g particles
+            rest_density: 10.0,     // Much lower rest density for 1g particles in small volume
             viscosity: 0.001,       // Water viscosity
             surface_tension: 0.073, // Water surface tension
 
-            // Performance optimized PBD parameters
-            pbd_iterations: 1, // Single iteration for maximum performance
-            pbd_constraint_epsilon: 1e-4, // Slightly relaxed for early exit
-            pbd_relaxation_factor: 0.5, // Higher relaxation for faster convergence in single iteration
+            // Stronger PBD parameters for better stacking
+            pbd_iterations: 3, // More iterations for stronger constraints
+            pbd_constraint_epsilon: 1e-4, // Tighter epsilon for better precision
+            pbd_relaxation_factor: 0.8, // Higher relaxation for stronger effect
         }
     }
 }
@@ -133,6 +133,79 @@ impl SimulationConfig {
             grid_size: 0.1 * 0.8,
             max_neighbors: 64,
             ..Self::default()
+        }
+    }
+
+    /// Create configuration optimized for stable stacking
+    #[allow(dead_code)]
+    pub fn stable_stacking() -> Self {
+        Self {
+            simulation_aabb: Aabb::new(Vec3::new(-1.0, -1.0, -1.0), Vec3::new(1.0, 1.0, 1.0)),
+            gravity: Vec3::new(0.0, -5.0, 0.0), // Reduced gravity for better control
+            max_time_step: 1.0 / 120.0,         // Very small time steps
+            min_time_step: 1.0 / 300.0,
+            sph_params: SphParams {
+                particle_mass: 0.001,
+                smoothing_radius: 0.08, // Smaller radius for tighter packing
+                rest_density: 15.0,     // Slightly higher for more constraint force
+                viscosity: 0.01,        // Higher viscosity for damping
+                surface_tension: 0.073,
+                pbd_iterations: 5,            // More iterations for stability
+                pbd_constraint_epsilon: 1e-5, // Very tight constraint
+                pbd_relaxation_factor: 0.6,   // Moderate relaxation
+            },
+            grid_size: 0.08 * 0.9,
+            max_neighbors: 64,
+        }
+    }
+
+    /// Create configuration for fountain spray effect
+    #[allow(dead_code)]
+    pub fn fountain_spray() -> Self {
+        Self {
+            simulation_aabb: Aabb::new(Vec3::new(-0.5, -0.5, -0.5), Vec3::new(0.5, 0.5, 0.5)),
+            gravity: Vec3::new(0.01, -9.8, 0.01),
+            max_time_step: 1.0 / 60.0,
+            min_time_step: 1.0 / 240.0,
+            sph_params: SphParams {
+                particle_mass: 0.001,
+                smoothing_radius: 0.03,
+                rest_density: 25.0,
+                viscosity: 0.005,
+                surface_tension: 0.073,
+                pbd_iterations: 6,
+                pbd_constraint_epsilon: 1e-5,
+                pbd_relaxation_factor: 0.8,
+            },
+            grid_size: 0.02 * 0.5,
+            max_neighbors: 128,
+        }
+    }
+
+    /// Create configuration for tube/cylinder container stacking test
+    #[allow(dead_code)]
+    pub fn tube_stacking() -> Self {
+        Self {
+            // 创建一个管状容器：细长的圆柱形
+            simulation_aabb: Aabb::new(
+                Vec3::new(-0.2, -1.0, -0.2), // 小的横截面（0.4m直径）
+                Vec3::new(0.2, 1.0, 0.2),    // 高2m的管子
+            ),
+            gravity: Vec3::new(0.0, -9.81, 0.0), // 标准重力
+            max_time_step: 1.0 / 120.0,          // 小时间步长确保稳定性
+            min_time_step: 1.0 / 300.0,
+            sph_params: SphParams {
+                particle_mass: 0.002,   // 稍微重一点的粒子
+                smoothing_radius: 0.06, // 较小的影响半径适合密集堆叠
+                rest_density: 20.0,     // 较高的静息密度促进堆叠
+                viscosity: 0.02,        // 增加粘性帮助稳定
+                surface_tension: 0.073,
+                pbd_iterations: 8,            // 更多迭代确保约束满足
+                pbd_constraint_epsilon: 1e-6, // 非常严格的约束
+                pbd_relaxation_factor: 0.5,   // 温和的松弛因子
+            },
+            grid_size: 0.06 * 0.8, // 网格大小略小于影响半径
+            max_neighbors: 96,     // 增加邻居数以处理密集堆叠
         }
     }
 
@@ -287,7 +360,7 @@ mod tests {
         // Test time step limiting functionality
         assert_eq!(config.clamp_time_step(0.001), config.min_time_step); // Too small
         assert_eq!(config.clamp_time_step(0.1), config.max_time_step); // Too large
-        assert_eq!(config.clamp_time_step(0.02), 0.02); // Normal range
+        assert_eq!(config.clamp_time_step(0.01), 0.01); // Normal range - within default limits
 
         // Verify actual game scenario time steps
         let dt_60fps = 1.0 / 60.0; // ~16.67ms
@@ -295,7 +368,8 @@ mod tests {
         let dt_120fps = 1.0 / 120.0; // ~8.33ms
 
         assert_eq!(config.clamp_time_step(dt_60fps), dt_60fps);
-        assert_eq!(config.clamp_time_step(dt_30fps), dt_30fps);
+        // 30 FPS时间步长超过max_time_step，会被钳制
+        assert_eq!(config.clamp_time_step(dt_30fps), config.max_time_step);
         assert_eq!(config.clamp_time_step(dt_120fps), dt_120fps);
 
         println!(

@@ -1,0 +1,140 @@
+#version 450
+
+layout(local_size_x = 256) in;
+
+layout(push_constant) uniform Constants
+{
+    uint particle_count;
+    float smoothing_radius;
+    float smoothing_radius_sq;
+    float grid_size;
+    uint max_neighbors;
+}
+constants;
+
+layout(binding = 0) readonly buffer PredictedPositionBuffer
+{
+    vec4 predicted_positions[];
+};
+
+layout(binding = 1) readonly buffer SortedIndexBuffer
+{
+    uint sorted_indices[];
+};
+
+layout(binding = 2) readonly buffer CellStartBuffer
+{
+    uint cell_start[];
+};
+
+layout(binding = 3) readonly buffer CellEndBuffer
+{
+    uint cell_end[];
+};
+
+layout(binding = 4) writeonly buffer ContactsBuffer
+{
+    uint contacts[];
+};
+
+layout(binding = 5) writeonly buffer ContactCountsBuffer
+{
+    uint contact_counts[];
+};
+
+uint expandBits(uint v)
+{
+    v = (v * 0x00010001u) & 0xFF0000FFu;
+    v = (v * 0x00000101u) & 0x0F00F00Fu;
+    v = (v * 0x00000011u) & 0xC30C30C3u;
+    v = (v * 0x00000005u) & 0x49249249u;
+    return v;
+}
+
+uint morton3D(uvec3 grid_pos)
+{
+    return (expandBits(grid_pos.x) << 0) | (expandBits(grid_pos.y) << 1) | (expandBits(grid_pos.z) << 2);
+}
+
+uint calculateMortonCode(ivec3 grid_pos)
+{
+    uvec3 pos = uvec3(grid_pos & 0xFFFFFFFF);
+    return morton3D(pos);
+}
+
+void main()
+{
+    uint i = gl_GlobalInvocationID.x;
+    if (i >= constants.particle_count)
+        return;
+
+    vec3 pos_i = predicted_positions[i].xyz;
+    uint neighbor_count = 0;
+
+    ivec3 grid_pos = ivec3(floor(pos_i / constants.grid_size));
+    
+    const int cell_offsets[27][3] = {
+        {0, 0, 0},
+
+        {-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1},
+
+        {-1, -1, 0}, {-1, 1, 0}, {1, -1, 0}, {1, 1, 0},
+        {-1, 0, -1}, {-1, 0, 1}, {1, 0, -1}, {1, 0, 1},
+        {0, -1, -1}, {0, -1, 1}, {0, 1, -1}, {0, 1, 1},
+
+        {-1, -1, -1}, {-1, -1, 1}, {-1, 1, -1}, {-1, 1, 1},
+        {1, -1, -1}, {1, -1, 1}, {1, 1, -1}, {1, 1, 1}
+    };
+    
+    for (int cell_idx = 0; cell_idx < 27; cell_idx++)
+    {
+        ivec3 neighbor_grid = grid_pos + ivec3(
+            cell_offsets[cell_idx][0],
+            cell_offsets[cell_idx][1], 
+            cell_offsets[cell_idx][2]
+        );
+        
+        uint morton_code = calculateMortonCode(neighbor_grid);
+        uint cell_index = morton_code & 0xFFFFu;
+        
+        uint start_idx = cell_start[cell_index];
+        uint end_idx = cell_end[cell_index];
+        
+        if (start_idx == 0xFFFFFFFFu || end_idx == 0xFFFFFFFFu || start_idx >= end_idx)
+            continue;
+            
+        for (uint idx = start_idx; idx < end_idx; idx++)
+        {
+            if (idx >= constants.particle_count)
+                break;
+                
+            uint j = sorted_indices[idx];
+            if (j >= constants.particle_count || j == i)
+                continue;
+                
+            vec3 pos_j = predicted_positions[j].xyz;
+            vec3 r_vec = pos_i - pos_j;
+            float r_sq = dot(r_vec, r_vec);
+
+            if (r_sq < constants.smoothing_radius_sq)
+            {
+                if (neighbor_count < constants.max_neighbors)
+                {
+                    uint contact_index = i * constants.max_neighbors + neighbor_count;
+                    contacts[contact_index] = j;
+                    neighbor_count++;
+                }
+                else
+                {
+                    cell_idx = 27;
+                    break;
+                }
+            }
+        }
+        
+        if (neighbor_count >= constants.max_neighbors)
+            break;
+    }
+    
+    contact_counts[i] = neighbor_count;
+} 

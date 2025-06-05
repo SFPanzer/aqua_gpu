@@ -14,3 +14,4 @@ egui_winit_vulkano = "0.28"
 
 glam = {version = "0.28", features = ["serde"]}
 serde = {version = "1.0", features = ["derive"]}
+rand = "0.9.1"

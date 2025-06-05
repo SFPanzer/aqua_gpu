@@ -70,7 +70,7 @@ mod tests {
         core::{ParticleInitData, Particles},
         systems::simulation::tasks::{
             radix_sort_histogram::{RadixSortCountConstants, RadixSortCountTask},
-            MortonHashConstants,
+            MortonHashConstants, PredictPositionConstants, PredictPositionTask,
         },
         utils::GpuTaskExecutor,
     };
@@ -87,28 +87,41 @@ mod tests {
             &[
                 ParticleInitData {
                     position: Vec3::new(0.0, 0.0, -1.0),
-                    velocitie: Vec3::new(0.0, 0.0, 0.0),
+                    velocity: Vec3::new(0.0, 0.0, 0.0),
                 },
                 ParticleInitData {
                     position: Vec3::new(0.0, -1.0, 0.0),
-                    velocitie: Vec3::new(0.0, 0.0, 0.0),
+                    velocity: Vec3::new(0.0, 0.0, 0.0),
                 },
                 ParticleInitData {
                     position: Vec3::new(-1.0, 0.0, 0.0),
-                    velocitie: Vec3::new(0.0, 0.0, 0.0),
+                    velocity: Vec3::new(0.0, 0.0, 0.0),
                 },
                 ParticleInitData {
                     position: Vec3::new(0.0, -1.0, -1.0),
-                    velocitie: Vec3::new(0.0, 0.0, 0.0),
+                    velocity: Vec3::new(0.0, 0.0, 0.0),
                 },
                 ParticleInitData {
                     position: Vec3::new(-1.0, 0.0, -1.0),
-                    velocitie: Vec3::new(0.0, 0.0, 0.0),
+                    velocity: Vec3::new(0.0, 0.0, 0.0),
                 },
             ],
             backend.memory_allocator(),
             &backend,
         );
+
+        let predict_pos_constants = PredictPositionConstants::new(
+            particles.count(),
+            0.1,
+            crate::core::Aabb::new(
+                glam::Vec3::new(-1.0, -1.0, -1.0),
+                glam::Vec3::new(1.0, 1.0, 1.0),
+            ),
+        );
+        let mut predict_pos_task = PredictPositionTask::new(backend.device());
+        predict_pos_task.set_constants(predict_pos_constants);
+        predict_pos_task.update_descriptor_set(&backend.descriptor_set_allocator(), &mut particles);
+        backend.execute(&mut predict_pos_task);
 
         // Calculate hash values
         let hash_constants = MortonHashConstants::new(particles.count(), 1.0);

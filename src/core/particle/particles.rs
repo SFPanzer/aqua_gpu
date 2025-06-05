@@ -22,7 +22,7 @@ const PARTICLE_MAX_COUNT: u32 = 0x100000; // 1 million particles
 
 pub struct ParticleInitData {
     pub position: Vec3,
-    pub velocitie: Vec3,
+    pub velocity: Vec3,
 }
 
 pub(crate) struct Particles {
@@ -38,6 +38,14 @@ pub(crate) struct Particles {
     prefix_sums: Subbuffer<[u32]>,
     density: Subbuffer<[f32]>,
     predicted_position: Subbuffer<[ParticlePosition]>,
+    // Cell index tables for fast neighbor lookup (64K entries for low 16 bits of hash)
+    cell_start: Subbuffer<[u32]>,
+    cell_end: Subbuffer<[u32]>,
+    // PBD solver buffers
+    contacts: Subbuffer<[u32]>,                    // 邻居粒子索引数组
+    contact_counts: Subbuffer<[u32]>,              // 每个粒子的邻居数量
+    lambda: Subbuffer<[f32]>,                      // 拉格朗日乘子
+    delta_position: Subbuffer<[ParticlePosition]>, // 位置增量
     descriptor_sets: HashMap<TaskId, Arc<DescriptorSet>>,
 }
 
@@ -182,6 +190,75 @@ impl Particles {
         )
         .unwrap();
 
+        // Cell index tables for fast neighbor lookup (64K entries for low 16 bits of hash)
+        let cell_start = Buffer::new_slice(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER,
+                ..Default::default()
+            },
+            allocation_create_info.clone(),
+            65536u64, // 64K entries for 16-bit hash values
+        )
+        .unwrap();
+
+        let cell_end = Buffer::new_slice(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER,
+                ..Default::default()
+            },
+            allocation_create_info.clone(),
+            65536u64, // 64K entries for 16-bit hash values
+        )
+        .unwrap();
+
+        // PBD solver buffers
+        let max_neighbors = 96u64; // 参考博客中的设置
+        let contacts = Buffer::new_slice(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER,
+                ..Default::default()
+            },
+            allocation_create_info.clone(),
+            PARTICLE_MAX_COUNT as u64 * max_neighbors, // 每个粒子最多96个邻居
+        )
+        .unwrap();
+
+        let contact_counts = Buffer::new_slice(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER,
+                ..Default::default()
+            },
+            allocation_create_info.clone(),
+            PARTICLE_MAX_COUNT as u64,
+        )
+        .unwrap();
+
+        let lambda = Buffer::new_slice(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER,
+                ..Default::default()
+            },
+            allocation_create_info.clone(),
+            PARTICLE_MAX_COUNT as u64,
+        )
+        .unwrap();
+
+        let delta_position = Buffer::new_slice(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER,
+                ..Default::default()
+            },
+            allocation_create_info.clone(),
+            PARTICLE_MAX_COUNT as u64,
+        )
+        .unwrap();
+
         Self {
             position,
             velocity,
@@ -192,7 +269,13 @@ impl Particles {
             histograms,
             prefix_sums,
             density,
-            predicted_position, // 新增
+            predicted_position,
+            cell_start,
+            cell_end,
+            contacts,
+            contact_counts,
+            lambda,
+            delta_position,
             count: 0,
             cursor: 0,
             descriptor_sets: HashMap::new(),
@@ -247,6 +330,32 @@ impl Particles {
     #[allow(unused)]
     pub fn predicted_position(&self) -> &Subbuffer<[ParticlePosition]> {
         &self.predicted_position
+    }
+
+    // Cell index table accessors
+    pub fn cell_start(&self) -> &Subbuffer<[u32]> {
+        &self.cell_start
+    }
+
+    pub fn cell_end(&self) -> &Subbuffer<[u32]> {
+        &self.cell_end
+    }
+
+    // PBD solver buffer accessors
+    pub fn contacts(&self) -> &Subbuffer<[u32]> {
+        &self.contacts
+    }
+
+    pub fn contact_counts(&self) -> &Subbuffer<[u32]> {
+        &self.contact_counts
+    }
+
+    pub fn lambda(&self) -> &Subbuffer<[f32]> {
+        &self.lambda
+    }
+
+    pub fn delta_position(&self) -> &Subbuffer<[ParticlePosition]> {
+        &self.delta_position
     }
 
     pub fn descriptor_sets(&mut self) -> &mut HashMap<TaskId, Arc<DescriptorSet>> {
@@ -322,7 +431,7 @@ impl Particles {
         let velocities = particles_init_data
             .iter()
             .map(|p| ParticleVelocity {
-                velocity: p.velocitie.extend(0.0).to_array(),
+                velocity: p.velocity.extend(0.0).to_array(),
             })
             .collect::<Vec<_>>();
 
@@ -392,6 +501,7 @@ impl Particles {
     }
 
     // 新增: 将position复制到predicted_position
+    #[cfg(test)]
     pub fn copy_position_to_predicted(&mut self, task_executor: &impl GpuTaskExecutor) {
         if self.count == 0 {
             return;
@@ -467,13 +577,14 @@ impl GpuTask for ParticleStageTask {
     }
 }
 
-// 新增: PositionCopyTask，用于在GPU上复制位置数据
+#[cfg(test)]
 pub(super) struct PositionCopyTask {
     src: Subbuffer<[ParticlePosition]>,
     dst: Subbuffer<[ParticlePosition]>,
     regions: Vec<BufferCopy>,
 }
 
+#[cfg(test)]
 impl PositionCopyTask {
     pub fn new(
         src: Subbuffer<[ParticlePosition]>,
@@ -484,6 +595,7 @@ impl PositionCopyTask {
     }
 }
 
+#[cfg(test)]
 impl GpuTask for PositionCopyTask {
     fn record(&self, builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>) {
         let mut copy_info = CopyBufferInfoTyped::buffers(self.src.clone(), self.dst.clone());
