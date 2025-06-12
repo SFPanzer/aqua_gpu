@@ -30,7 +30,7 @@ impl App {
         let simulation_system = SimulationSystem::new(SimulationConfig::fountain_spray());
 
         let camera = Camera::new(
-            Vec3::new(0.0, 0.8, 1.0),
+            Vec3::new(0.0, 10., 10.),
             Quat::from_euler(EulerRot::XYZ, -45.0f32.to_radians(), 0.0, 0.0),
             60.,
             0.1,
@@ -55,15 +55,16 @@ impl App {
 
     pub fn update(&mut self) {
         self.frame_count += 1;
-
-        self.particles.dst().add_particles(
-            &[ParticleInitData {
-                position: Vec3::new(0.0, 0.0, 0.0),
-                velocity: Vec3::new(0.0, 0.0, 0.0),
-            }],
-            self.vulkano_backend.memory_allocator(),
-            self.vulkano_backend.as_ref(),
-        );
+        if self.frame_count % 10 == 0 {
+            self.particles.dst().add_particles(
+                &[ParticleInitData {
+                    position: Vec3::new(0.0, 0.0, 0.0),
+                    velocity: Vec3::new(1.0, 0.0, 0.0),
+                }],
+                self.vulkano_backend.memory_allocator(),
+                self.vulkano_backend.as_ref(),
+            );
+        }
     }
 }
 

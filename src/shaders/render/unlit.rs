@@ -34,7 +34,7 @@ pub mod fs {
             layout(location = 0) out vec4 f_color;
 
             void main() {
-                float max_speed = 1.0;
+                float max_speed = 3.0;
                 float t = clamp(v_speed / max_speed, 0.0, 1.0);
 
                 vec3 color = mix(vec3(0.0, 1.0, 1.0), vec3(1.0, 1.0, 0.0), t);

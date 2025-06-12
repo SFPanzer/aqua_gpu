@@ -163,21 +163,21 @@ impl SimulationConfig {
     #[allow(dead_code)]
     pub fn fountain_spray() -> Self {
         Self {
-            simulation_aabb: Aabb::new(Vec3::new(-0.5, -0.5, -0.5), Vec3::new(0.5, 0.5, 0.5)),
+            simulation_aabb: Aabb::new(Vec3::new(-1.0, -5.0, -1.0), Vec3::new(1., 5., 1.)),
             gravity: Vec3::new(0.01, -9.8, 0.01),
             max_time_step: 1.0 / 60.0,
             min_time_step: 1.0 / 240.0,
             sph_params: SphParams {
-                particle_mass: 0.001,
-                smoothing_radius: 0.03,
-                rest_density: 25.0,
+                particle_mass: 0.2,
+                smoothing_radius: 0.2,
+                rest_density: 10.0,
                 viscosity: 0.005,
                 surface_tension: 0.073,
-                pbd_iterations: 6,
+                pbd_iterations: 1,
                 pbd_constraint_epsilon: 1e-5,
-                pbd_relaxation_factor: 0.8,
+                pbd_relaxation_factor: 0.01,
             },
-            grid_size: 0.02 * 0.5,
+            grid_size: 0.5 * 0.5,
             max_neighbors: 128,
         }
     }
